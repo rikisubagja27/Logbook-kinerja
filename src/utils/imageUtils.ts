@@ -4,60 +4,121 @@
 
 export async function resizeImageFile(
   file: File,
-  maxDimension = 1080,
-  quality = 0.8
+  maxDimension = 1200,
+  quality = 0.82
 ): Promise<{ dataUrl: string; width: number; height: number; originalSize: number; newSize: number }> {
   return new Promise((resolve, reject) => {
+    if (!file) {
+      reject(new Error('File tidak ditemukan'));
+      return;
+    }
+
+    // Safety check: ensure file is an image
+    if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|bmp|gif|heic|heif)$/i.test(file.name)) {
+      reject(new Error('File yang dipilih bukan format gambar yang didukung (gunakan JPG, PNG, atau WebP)'));
+      return;
+    }
+
     const reader = new FileReader();
-    reader.onerror = () => reject(new Error('Gagal membaca file gambar'));
+    reader.onerror = () => reject(new Error('Gagal membaca file gambar dari perangkat'));
     reader.onload = (e) => {
+      const rawResult = e.target?.result as string;
+      if (!rawResult) {
+        reject(new Error('Data gambar kosong'));
+        return;
+      }
+
       const img = new Image();
-      img.onerror = () => reject(new Error('Format gambar tidak valid'));
-      img.onload = () => {
-        let width = img.width;
-        let height = img.height;
-
-        // Calculate proportional dimensions
-        if (width > maxDimension || height > maxDimension) {
-          if (width > height) {
-            height = Math.round((height * maxDimension) / width);
-            width = maxDimension;
-          } else {
-            width = Math.round((width * maxDimension) / height);
-            height = maxDimension;
-          }
-        }
-
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
-
-        const ctx = canvas.getContext('2d');
-        if (!ctx) {
-          reject(new Error('Tidak dapat membuat canvas konteks'));
-          return;
-        }
-
-        // Draw image smoothly
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = 'high';
-        ctx.drawImage(img, 0, 0, width, height);
-
-        const dataUrl = canvas.toDataURL('image/jpeg', quality);
-        
-        // Approximate byte size of base64
-        const stringLength = dataUrl.length - 'data:image/jpeg;base64,'.length;
-        const newSize = Math.round(stringLength * 0.75);
-
+      img.onerror = () => {
+        // Fallback: If image cannot be loaded into canvas (e.g. SVG or browser quirk), resolve with raw dataUrl
         resolve({
-          dataUrl,
-          width,
-          height,
+          dataUrl: rawResult,
+          width: 800,
+          height: 600,
           originalSize: file.size,
-          newSize,
+          newSize: file.size,
         });
       };
-      img.src = e.target?.result as string;
+
+      img.onload = () => {
+        try {
+          let width = img.naturalWidth || img.width;
+          let height = img.naturalHeight || img.height;
+
+          if (!width || !height) {
+            resolve({
+              dataUrl: rawResult,
+              width: 800,
+              height: 600,
+              originalSize: file.size,
+              newSize: file.size,
+            });
+            return;
+          }
+
+          // Calculate proportional dimensions
+          if (width > maxDimension || height > maxDimension) {
+            if (width > height) {
+              height = Math.round((height * maxDimension) / width);
+              width = maxDimension;
+            } else {
+              width = Math.round((width * maxDimension) / height);
+              height = maxDimension;
+            }
+          }
+
+          const canvas = document.createElement('canvas');
+          canvas.width = width;
+          canvas.height = height;
+
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve({
+              dataUrl: rawResult,
+              width,
+              height,
+              originalSize: file.size,
+              newSize: file.size,
+            });
+            return;
+          }
+
+          // Draw image smoothly
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+          ctx.drawImage(img, 0, 0, width, height);
+
+          let dataUrl = '';
+          try {
+            dataUrl = canvas.toDataURL('image/jpeg', quality);
+          } catch {
+            dataUrl = canvas.toDataURL(); // Default PNG fallback
+          }
+
+          // Approximate byte size of base64
+          const stringLength = dataUrl.length - (dataUrl.indexOf(',') + 1);
+          const newSize = Math.round(stringLength * 0.75);
+
+          resolve({
+            dataUrl,
+            width,
+            height,
+            originalSize: file.size,
+            newSize: newSize || file.size,
+          });
+        } catch (canvasErr) {
+          console.warn('Canvas resize fallback:', canvasErr);
+          resolve({
+            dataUrl: rawResult,
+            width: img.width || 800,
+            height: img.height || 600,
+            originalSize: file.size,
+            newSize: file.size,
+          });
+        }
+      };
+
+      img.src = rawResult;
     };
     reader.readAsDataURL(file);
   });

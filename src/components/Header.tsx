@@ -14,12 +14,16 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, profile
     <header className="sticky top-0 z-40 bg-stone-950/85 backdrop-blur-md border-b border-emerald-500/25 shadow-lg no-print">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16 gap-8">
-          {/* Zone 1: Brand Wordmark */}
+          {/* Zone 1: Brand Wordmark with User Logo */}
           <div 
             onClick={() => setActiveTab('form')}
             className="flex items-center gap-3 cursor-pointer group shrink-0"
           >
-            <MinistryLogo size={36} />
+            <img
+              src="/assets/aistudio/Black_and_White_Simple_Typographic_Nochnick_Design_Studio_Logo_20261020_000522_0000_46128b6c.png"
+              alt="Logo Logbook Kinerja KPS 1 Manoko"
+              className="h-10 w-10 rounded-lg object-contain border border-emerald-400/40 shadow-xs bg-emerald-950/80 p-0.5 group-hover:border-emerald-300 transition-colors"
+            />
             <div className="flex flex-col">
               <span className="font-bold text-base tracking-tight text-white group-hover:text-emerald-300 transition-colors whitespace-nowrap">
                 Logbook Kinerja KPS 1 Manoko

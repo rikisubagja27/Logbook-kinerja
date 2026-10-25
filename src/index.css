@@ -3,15 +3,20 @@
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    background-color: #021a12;
+    color: #f8fafc;
+    min-height: 100vh;
   }
 }
 
-/* App Background with uploaded image */
+/* App Background with uploaded image and lush agricultural gradient overlay */
 .app-bg-gradient {
-  background-image: url('/assets/aistudio/227315dcaa73d0c772e73e49c5876675_e87d568d.jpg');
+  background-color: #021a12;
+  background-image: 
+    linear-gradient(180deg, rgba(2, 26, 18, 0.78) 0%, rgba(4, 78, 59, 0.65) 40%, rgba(2, 44, 34, 0.82) 75%, rgba(1, 20, 14, 0.95) 100%),
+    url('/assets/aistudio/227315dcaa73d0c772e73e49c5876675_e87d568d.jpg');
   background-size: cover;
-  background-position: center;
-  background-attachment: fixed;
+  background-position: center top;
   background-repeat: no-repeat;
   min-height: 100vh;
 }

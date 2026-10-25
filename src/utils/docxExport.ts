@@ -43,6 +43,12 @@ export function getReportPeriodText(config: ReportConfig): string {
   return `Tahun ${config.tahun}`;
 }
 
+function formatDocxNip(nip?: string): string {
+  if (!nip) return '-';
+  const cleaned = nip.replace(/^NIP[:.\s]*/i, '').trim();
+  return cleaned || '-';
+}
+
 // Convert dataURL (including SVG dataURL) to raster JPEG/PNG Uint8Array
 async function rasterizeImageToUint8Array(dataUrl: string): Promise<{ data: Uint8Array; width: number; height: number } | null> {
   try {
@@ -158,17 +164,16 @@ export async function exportReportToDocx(
     quarterMonths.forEach((m) => {
       const monthEntries = filtered.filter((e) => new Date(e.tanggal).getMonth() + 1 === m);
       const items: string[] = [];
-      const groupedByCategory: Record<string, string[]> = {};
 
       monthEntries.forEach((e) => {
-        if (!groupedByCategory[e.kategori]) {
-          groupedByCategory[e.kategori] = [];
+        if (e.kehadiran === 'Sakit') {
+          items.push(`Izin Sakit: ${e.keterangan || 'Istirahat Sakit'}`);
+        } else if (e.kehadiran === 'Cuti') {
+          items.push(`Cuti: ${e.keterangan || 'Cuti Resmi'}`);
+        } else {
+          const locInfo = e.lokasiPekerjaan && e.lokasiPekerjaan !== '-' ? ` (${e.lokasiPekerjaan})` : '';
+          items.push(`${e.uraianPekerjaan}${locInfo}`);
         }
-        groupedByCategory[e.kategori].push(e.uraianPekerjaan);
-      });
-
-      Object.entries(groupedByCategory).forEach(([category, descs]) => {
-        items.push(`${category}: ${descs.join(', ')}`);
       });
 
       if (items.length === 0) {
@@ -192,14 +197,15 @@ export async function exportReportToDocx(
       } else if (e.kehadiran === 'Cuti') {
         itemDesc = `Cuti: ${e.keterangan || 'Cuti Resmi'}`;
       } else {
-        const parts: string[] = [];
-        if (e.kategori) parts.push(e.kategori);
-        if (e.uraianPekerjaan) parts.push(e.uraianPekerjaan);
+        let desc = e.uraianPekerjaan;
         const locDetails: string[] = [];
         if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
         if (e.luasLahan && e.luasLahan !== '-') locDetails.push(`Luas: ${e.luasLahan}`);
-        const locStr = locDetails.length > 0 ? ` (${locDetails.join(', ')})` : '';
-        itemDesc = `${parts.join(': ')}${locStr}`;
+        if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
+        if (locDetails.length > 0) {
+          desc += ` (${locDetails.join(', ')})`;
+        }
+        itemDesc = desc;
       }
 
       table1Groups.push({
@@ -213,13 +219,10 @@ export async function exportReportToDocx(
     [1, 2, 3, 4].forEach((q) => {
       const qMonths = ({ 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] } as Record<number, number[]>)[q] || [];
       const qEntries = filtered.filter((e) => qMonths.includes(new Date(e.tanggal).getMonth() + 1));
-      const items: string[] = [];
-      const cats: Record<string, number> = {};
-      qEntries.forEach((e) => {
-        cats[e.kategori] = (cats[e.kategori] || 0) + 1;
-      });
-      Object.entries(cats).forEach(([cat, count]) => {
-        items.push(`${cat} (${count} kegiatan terlaksana)`);
+      const items = qEntries.map((e) => {
+        if (e.kehadiran === 'Sakit') return `Izin Sakit: ${e.keterangan || '-'}`;
+        if (e.kehadiran === 'Cuti') return `Cuti: ${e.keterangan || '-'}`;
+        return e.uraianPekerjaan;
       });
       if (items.length === 0) {
         items.push('Pelaksanaan tugas operasional dan pemeliharaan kebun');
@@ -473,7 +476,7 @@ export async function exportReportToDocx(
           }),
           new Paragraph({
             alignment: AlignmentType.CENTER,
-            children: [new TextRun({ text: profile.nip, size: 24 })],
+            children: [new TextRun({ text: formatDocxNip(profile.nip), size: 24 })],
             spacing: { after: 360 },
           }),
           new Paragraph({
@@ -716,7 +719,7 @@ export async function exportReportToDocx(
           }),
           new Paragraph({
             alignment: AlignmentType.RIGHT,
-            children: [new TextRun({ text: profile.nip })],
+            children: [new TextRun({ text: formatDocxNip(profile.nip) })],
           }),
         ],
       },

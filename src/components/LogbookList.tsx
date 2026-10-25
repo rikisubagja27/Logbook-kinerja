@@ -46,7 +46,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
           const q = searchTerm.toLowerCase();
           const matchUraian = entry.uraianPekerjaan.toLowerCase().includes(q);
           const matchLokasi = entry.lokasiPekerjaan.toLowerCase().includes(q);
-          const matchKategori = entry.kategori.toLowerCase().includes(q);
+          const matchKategori = (entry.kategori || '').toLowerCase().includes(q);
           if (!matchUraian && !matchLokasi && !matchKategori) return false;
         }
 
@@ -322,14 +322,9 @@ export const LogbookList: React.FC<LogbookListProps> = ({
                     </span>
                   </div>
 
-                  {/* Category & Title */}
+                  {/* Title */}
                   <div>
-                    {entry.kehadiran === 'WFO' && (
-                      <span className="text-xs font-bold text-emerald-800 uppercase tracking-wide">
-                        {entry.kategori}
-                      </span>
-                    )}
-                    <p className="text-sm font-medium text-stone-900 mt-0.5 leading-relaxed">
+                    <p className="text-sm font-semibold text-stone-900 mt-0.5 leading-relaxed">
                       {entry.uraianPekerjaan}
                     </p>
                   </div>

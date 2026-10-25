@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { 
   AttendanceStatus, 
   JobCategory, 
@@ -17,7 +17,9 @@ import {
   Sparkles,
   FileCheck,
   FileText,
-  FileSpreadsheet
+  FileSpreadsheet,
+  Camera,
+  RefreshCw
 } from 'lucide-react';
 
 interface LogbookFormProps {
@@ -39,18 +41,6 @@ const COMMON_LOCATIONS = [
   'Area Embung & Irigasi',
 ];
 
-const JOB_CATEGORIES: JobCategory[] = [
-  'Pengolahan Lahan & Persiapan Tanam',
-  'Pemeliharaan & Sanitasi',
-  'Penanaman & Persemaian',
-  'Uji BUSS',
-  'Panen & Pasca Panen',
-  'Pemupukan & Saprodi',
-  'Sarana / Administrasi',
-  'Dukungan Operasional & Kedinasan',
-  'Lainnya',
-];
-
 const DRAFT_STORAGE_KEY = 'kps1_manoko_logbook_draft_v2';
 
 export const LogbookForm: React.FC<LogbookFormProps> = ({
@@ -59,6 +49,33 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
   editingEntry,
   onNavigateToReport,
 }) => {
+  // Direct file input refs for 100% reliable click triggering
+  const fileInputSebelumRef = useRef<HTMLInputElement | null>(null);
+  const fileInputSesudahRef = useRef<HTMLInputElement | null>(null);
+  const fileInputSuratRef = useRef<HTMLInputElement | null>(null);
+  const formTopRef = useRef<HTMLDivElement | null>(null);
+
+  const triggerUploadSebelum = () => {
+    if (fileInputSebelumRef.current) {
+      fileInputSebelumRef.current.value = '';
+      fileInputSebelumRef.current.click();
+    }
+  };
+
+  const triggerUploadSesudah = () => {
+    if (fileInputSesudahRef.current) {
+      fileInputSesudahRef.current.value = '';
+      fileInputSesudahRef.current.click();
+    }
+  };
+
+  const triggerUploadSurat = () => {
+    if (fileInputSuratRef.current) {
+      fileInputSuratRef.current.value = '';
+      fileInputSuratRef.current.click();
+    }
+  };
+
   // Load draft if not editing existing historical entry
   const getInitialDraft = () => {
     if (editingEntry) return null;
@@ -85,17 +102,14 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
   const [waktuSelesai, setWaktuSelesai] = useState<string>(
     editingEntry?.waktuSelesai || initialDraft?.waktuSelesai || '16:00'
   );
-  const [kategori, setKategori] = useState<JobCategory>(
-    editingEntry?.kategori || initialDraft?.kategori || 'Pengolahan Lahan & Persiapan Tanam'
+  const [uraianPekerjaan, setUraianPekerjaan] = useState<string>(
+    editingEntry?.uraianPekerjaan || initialDraft?.uraianPekerjaan || ''
   );
   const [lokasiPekerjaan, setLokasiPekerjaan] = useState<string>(
     editingEntry?.lokasiPekerjaan || initialDraft?.lokasiPekerjaan || ''
   );
   const [luasLahan, setLuasLahan] = useState<string>(
     editingEntry?.luasLahan || initialDraft?.luasLahan || ''
-  );
-  const [uraianPekerjaan, setUraianPekerjaan] = useState<string>(
-    editingEntry?.uraianPekerjaan || initialDraft?.uraianPekerjaan || ''
   );
   const [keterangan, setKeterangan] = useState<string>(
     editingEntry?.keterangan || initialDraft?.keterangan || ''
@@ -151,10 +165,9 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
             tanggal,
             waktuMulai,
             waktuSelesai,
-            kategori,
+            uraianPekerjaan,
             lokasiPekerjaan,
             luasLahan,
-            uraianPekerjaan,
             keterangan,
             suratSakit,
             suratSakitMeta,
@@ -175,10 +188,9 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     tanggal,
     waktuMulai,
     waktuSelesai,
-    kategori,
+    uraianPekerjaan,
     lokasiPekerjaan,
     luasLahan,
-    uraianPekerjaan,
     keterangan,
     suratSakit,
     suratSakitMeta,
@@ -189,25 +201,72 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     editingEntry,
   ]);
 
-  const handleClearDraft = () => {
-    if (confirm('Kosongkan draf pengisian yang belum disimpan dan mulai baru?')) {
-      localStorage.removeItem(DRAFT_STORAGE_KEY);
-      setKehadiran('WFO');
-      setTanggal(new Date().toISOString().split('T')[0]);
-      setWaktuMulai('07:30');
-      setWaktuSelesai('16:00');
-      setKategori('Pengolahan Lahan & Persiapan Tanam');
-      setLokasiPekerjaan('');
-      setLuasLahan('');
-      setUraianPekerjaan('');
-      setKeterangan('');
-      setSuratSakit(undefined);
-      setSuratSakitMeta(null);
-      setFotoSebelum(undefined);
-      setFotoSesudah(undefined);
+  // Synchronize when editing entry changes
+  useEffect(() => {
+    if (editingEntry) {
+      setKehadiran(editingEntry.kehadiran);
+      setTanggal(editingEntry.tanggal);
+      setWaktuMulai(editingEntry.waktuMulai || '07:30');
+      setWaktuSelesai(editingEntry.waktuSelesai || '16:00');
+      setUraianPekerjaan(editingEntry.uraianPekerjaan || '');
+      setLokasiPekerjaan(editingEntry.lokasiPekerjaan === '-' ? '' : (editingEntry.lokasiPekerjaan || ''));
+      setLuasLahan(editingEntry.luasLahan === '-' ? '' : (editingEntry.luasLahan || ''));
+      setKeterangan(editingEntry.keterangan === '-' ? '' : (editingEntry.keterangan || ''));
+      setSuratSakit(editingEntry.suratSakit);
+      setFotoSebelum(editingEntry.fotoSebelum);
+      setFotoSesudah(editingEntry.fotoSesudah);
       setSebelumMeta(null);
       setSesudahMeta(null);
-      setLastSavedTime(null);
+      setSuratSakitMeta(null);
+    }
+  }, [editingEntry]);
+
+  // Completely resets form to initial blank slate
+  const resetFormToEmpty = () => {
+    localStorage.removeItem(DRAFT_STORAGE_KEY);
+    setKehadiran('WFO');
+    setTanggal(new Date().toISOString().split('T')[0]);
+    setWaktuMulai('07:30');
+    setWaktuSelesai('16:00');
+    setUraianPekerjaan('');
+    setLokasiPekerjaan('');
+    setLuasLahan('');
+    setKeterangan('');
+    setSuratSakit(undefined);
+    setSuratSakitMeta(null);
+    setFotoSebelum(undefined);
+    setFotoSesudah(undefined);
+    setSebelumMeta(null);
+    setSesudahMeta(null);
+    setLastSavedTime(null);
+
+    if (fileInputSebelumRef.current) fileInputSebelumRef.current.value = '';
+    if (fileInputSesudahRef.current) fileInputSesudahRef.current.value = '';
+    if (fileInputSuratRef.current) fileInputSuratRef.current.value = '';
+  };
+
+  // Smooth scroll to top helper
+  const scrollToTop = () => {
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+    if (typeof document !== 'undefined') {
+      document.documentElement.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      document.body.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      const mainEl = document.querySelector('main');
+      if (mainEl) {
+        mainEl.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+      }
+    }
+    if (formTopRef.current) {
+      formTopRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  const handleClearDraft = () => {
+    if (confirm('Kosongkan formulir pengisian logbook dan mulai baru?')) {
+      resetFormToEmpty();
+      scrollToTop();
     }
   };
 
@@ -271,7 +330,6 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     let computedUraian = '';
     let finalLokasi = '-';
     let finalLuas = '-';
-    let finalKategori: JobCategory = 'Lainnya';
     let finalWaktuMulai = '-';
     let finalWaktuSelesai = '-';
     let finalFotoSebelum: string | undefined = undefined;
@@ -300,7 +358,6 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
       computedUraian = uraianPekerjaan.trim();
       finalLokasi = lokasiPekerjaan.trim() || '-';
       finalLuas = luasLahan.trim() || '-';
-      finalKategori = kategori;
       finalWaktuMulai = waktuMulai;
       finalWaktuSelesai = waktuSelesai;
       finalFotoSebelum = fotoSebelum;
@@ -313,7 +370,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
       kehadiran,
       waktuMulai: finalWaktuMulai,
       waktuSelesai: finalWaktuSelesai,
-      kategori: finalKategori,
+      kategori: 'Umum',
       uraianPekerjaan: computedUraian,
       lokasiPekerjaan: finalLokasi,
       luasLahan: finalLuas,
@@ -328,28 +385,58 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     onSaveEntry(newEntry);
     setShowSuccessToast(true);
 
-    // Clear auto-save draft upon successful submit
-    localStorage.removeItem(DRAFT_STORAGE_KEY);
-    setLastSavedTime(null);
+    // Completely empty and reset the form state so the page is clean for the next entry
+    resetFormToEmpty();
 
-    if (!editingEntry) {
-      setUraianPekerjaan('');
-      setKeterangan('');
-      setSuratSakit(undefined);
-      setSuratSakitMeta(null);
-      setFotoSebelum(undefined);
-      setFotoSesudah(undefined);
-      setSebelumMeta(null);
-      setSesudahMeta(null);
+    // If editing existing entry, exit edit mode
+    if (editingEntry && onCancelEdit) {
+      onCancelEdit();
     }
+
+    // Automatically scroll to the top of the page smoothly
+    scrollToTop();
+    setTimeout(scrollToTop, 80);
+    setTimeout(scrollToTop, 250);
 
     setTimeout(() => {
       setShowSuccessToast(false);
-    }, 4000);
+    }, 5000);
   };
 
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 space-y-4">
+      {/* Scroll anchor target */}
+      <div ref={formTopRef} id="logbook-form-top" className="h-0 w-0 -mt-6" />
+
+      {/* Top Banner on Successful Save & Form Clear for instant visual confirmation after auto-scroll */}
+      {showSuccessToast && (
+        <div className="bg-gradient-to-r from-emerald-950 via-emerald-900 to-emerald-950 border-2 border-emerald-400 text-white p-4 sm:p-5 rounded-2xl shadow-2xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in backdrop-blur-md">
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-emerald-500/25 border border-emerald-400/50 flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-6 h-6 text-emerald-300" />
+            </div>
+            <div>
+              <p className="text-base font-bold text-white tracking-wide">
+                Logbook Berhasil Disimpan & Halaman Dikosongkan!
+              </p>
+              <p className="text-xs text-emerald-200 mt-0.5">
+                Data otomatis tersinkronisasi ke laporan resmi & riwayat kinerja. Form telah di-reset bersih, siap untuk pengisian logbook berikutnya.
+              </p>
+            </div>
+          </div>
+          {onNavigateToReport && (
+            <button
+              type="button"
+              onClick={onNavigateToReport}
+              className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer shrink-0 shadow-md hover:shadow-lg flex items-center gap-1.5"
+            >
+              <span>Buka Laporan Resmi</span>
+              <span>→</span>
+            </button>
+          )}
+        </div>
+      )}
+
       {/* Toast Notification */}
       {showSuccessToast && (
         <div className="fixed bottom-6 right-6 z-50 bg-emerald-900 text-white px-5 py-3.5 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in border border-emerald-600">
@@ -357,7 +444,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
           <div>
             <p className="text-sm font-semibold">Logbook Berhasil Disimpan!</p>
             <p className="text-xs text-emerald-200">
-              Data otomatis tersinkronisasi ke laporan resmi & riwayat kinerja harian.
+              Data otomatis tersinkronisasi & form telah dikosongkan.
             </p>
           </div>
           {onNavigateToReport && (
@@ -575,6 +662,16 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                 )}
               </div>
 
+              {/* Hidden file input controlled via ref */}
+              <input
+                ref={fileInputSuratRef}
+                type="file"
+                accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+                disabled={isProcessingSurat}
+                onChange={handleSuratSakitUpload}
+                className="hidden"
+              />
+
               {suratSakit ? (
                 <div className="space-y-2">
                   <div className="relative rounded-lg overflow-hidden border border-stone-300 max-h-[300px] bg-stone-900 group flex items-center justify-center">
@@ -583,16 +680,26 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                       alt="Surat Keterangan Sakit Dokter"
                       className="max-h-[290px] w-auto object-contain mx-auto"
                     />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <label className="cursor-pointer bg-white text-stone-900 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-stone-100 transition-colors">
-                        Ganti File Surat Sakit
-                        <input
-                          type="file"
-                          accept="image/*"
-                          onChange={handleSuratSakitUpload}
-                          className="hidden"
-                        />
-                      </label>
+                    <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                      <button
+                        type="button"
+                        onClick={triggerUploadSurat}
+                        className="cursor-pointer bg-white text-stone-900 px-3.5 py-2 rounded-lg text-xs font-semibold hover:bg-stone-100 transition-colors shadow-md flex items-center gap-1.5"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Ganti Surat Sakit</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSuratSakit(undefined);
+                          setSuratSakitMeta(null);
+                        }}
+                        className="cursor-pointer bg-red-600 text-white px-3.5 py-2 rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors shadow-md flex items-center gap-1.5"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus</span>
+                      </button>
                     </div>
                   </div>
                   {suratSakitMeta && (
@@ -602,7 +709,18 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                   )}
                 </div>
               ) : (
-                <label className="border-2 border-dashed border-stone-300 hover:border-emerald-500 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50/30 transition-colors">
+                <div
+                  role="button"
+                  tabIndex={0}
+                  onClick={triggerUploadSurat}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      triggerUploadSurat();
+                    }
+                  }}
+                  className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50/40 transition-all select-none"
+                >
                   {isProcessingSurat ? (
                     <div className="flex flex-col items-center gap-2">
                       <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
@@ -610,26 +728,27 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                     </div>
                   ) : (
                     <>
-                      <Upload className="w-8 h-8 text-emerald-600/70 mb-2" />
-                      <span className="text-xs font-semibold text-stone-800 text-center">
+                      <Upload className="w-8 h-8 text-emerald-600 mb-2 pointer-events-none" />
+                      <span className="text-xs font-bold text-stone-800 text-center pointer-events-none">
                         Unggah Foto Surat Keterangan Sakit / Dokter
                       </span>
-                      <span className="text-[11px] text-stone-500 mt-1">
+                      <span className="text-[11px] text-stone-500 mt-1 pointer-events-none">
                         Pilih foto atau hasil pindai dokumen (JPG/PNG)
                       </span>
-                      <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded mt-2">
-                        Resize otomatis & tersimpan aman
-                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          triggerUploadSurat();
+                        }}
+                        className="mt-3 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Upload className="w-3.5 h-3.5" />
+                        <span>Pilih File Surat Dokter</span>
+                      </button>
                     </>
                   )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    disabled={isProcessingSurat}
-                    onChange={handleSuratSakitUpload}
-                    className="hidden"
-                  />
-                </label>
+                </div>
               )}
             </div>
           </div>
@@ -672,49 +791,32 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
         {/* ========================================================================= */}
         {kehadiran === 'WFO' && (
           <>
-            {/* Section 2: Detail Pekerjaan, Kategori & Lokasi */}
+            {/* Section 2: Detail Pekerjaan & Lingkup Operasional Lapangan */}
             <div className="bg-white p-5 rounded-2xl border border-stone-200 shadow-xs space-y-4 animate-fade-in">
               <h2 className="text-sm font-bold text-stone-900 uppercase tracking-wide flex items-center gap-2">
                 <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
                 2. Uraian Pekerjaan & Lingkup Operasional Lapangan
               </h2>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Kategori Pekerjaan */}
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1">
-                    Kategori Pekerjaan
-                  </label>
-                  <select
-                    value={kategori}
-                    onChange={(e) => setKategori(e.target.value as JobCategory)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-stone-50/50"
-                  >
-                    {JOB_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>
-                        {cat}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Luas Lahan */}
-                <div>
-                  <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
-                    <Maximize2 className="w-3.5 h-3.5 text-stone-500" />
-                    Luas Lahan / Volume Kerja
-                  </label>
-                  <input
-                    type="text"
-                    value={luasLahan}
-                    onChange={(e) => setLuasLahan(e.target.value)}
-                    placeholder="Contoh: 800 m², 1.200 m², 0.5 ha, atau '-'"
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-stone-50/50"
-                  />
-                </div>
+              {/* 1. Uraian Pekerjaan Lengkap (First) */}
+              <div>
+                <label className="block text-xs font-semibold text-stone-700 mb-1">
+                  Uraian Pekerjaan Lengkap <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  rows={3}
+                  value={uraianPekerjaan}
+                  onChange={(e) => setUraianPekerjaan(e.target.value)}
+                  required
+                  placeholder="Jelaskan secara rinci pekerjaan yang dilakukan (contoh: Pengolahan lahan Blok C7 menggunakan cultivator, penyiangan gulma di Blok B2, dsb)..."
+                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-stone-50/50"
+                ></textarea>
+                <p className="text-[11px] text-stone-500 mt-1">
+                  Uraian ini akan dirangkum otomatis ke dalam <strong>Tabel 1 Rincian Pekerjaan</strong> pada laporan resmi.
+                </p>
               </div>
 
-              {/* Lokasi Pekerjaan */}
+              {/* 2. Lokasi Pekerjaan di KPS 1 Manoko (Second) */}
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
                   <MapPin className="w-3.5 h-3.5 text-stone-500" />
@@ -743,25 +845,22 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                 </div>
               </div>
 
-              {/* Uraian Pekerjaan Detail */}
+              {/* 3. Luas Lahan / Volume Kerja (Third) */}
               <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1">
-                  Uraian Pekerjaan Lengkap <span className="text-red-500">*</span>
+                <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
+                  <Maximize2 className="w-3.5 h-3.5 text-stone-500" />
+                  Luas Lahan / Volume Kerja
                 </label>
-                <textarea
-                  rows={3}
-                  value={uraianPekerjaan}
-                  onChange={(e) => setUraianPekerjaan(e.target.value)}
-                  required
-                  placeholder="Jelaskan secara rinci pekerjaan yang dilakukan (contoh: Pengolahan lahan Blok C7 menggunakan cultivator, penyiangan gulma di Blok B2, dsb)..."
-                  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-stone-50/50"
-                ></textarea>
-                <p className="text-[11px] text-stone-500 mt-1">
-                  Uraian ini akan dirangkum otomatis ke dalam <strong>Tabel 1 Rincian Pekerjaan</strong> pada laporan resmi.
-                </p>
+                <input
+                  type="text"
+                  value={luasLahan}
+                  onChange={(e) => setLuasLahan(e.target.value)}
+                  placeholder="Contoh: 800 m², 1.200 m², 0.5 ha, atau '-'"
+                  className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-stone-50/50"
+                />
               </div>
 
-              {/* Keterangan Tambahan */}
+              {/* 4. Keterangan / Hasil Pelaksanaan (Fourth) */}
               <div>
                 <label className="block text-xs font-semibold text-stone-700 mb-1">
                   Keterangan / Hasil Pelaksanaan
@@ -796,6 +895,24 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
+                {/* Hidden File Inputs controlled via refs */}
+                <input
+                  ref={fileInputSebelumRef}
+                  type="file"
+                  accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+                  disabled={isProcessingSebelum}
+                  onChange={(e) => handlePhotoUpload(e, 'sebelum')}
+                  className="hidden"
+                />
+                <input
+                  ref={fileInputSesudahRef}
+                  type="file"
+                  accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+                  disabled={isProcessingSesudah}
+                  onChange={(e) => handlePhotoUpload(e, 'sesudah')}
+                  className="hidden"
+                />
+
                 {/* Foto Sebelum */}
                 <div className="border border-stone-200 rounded-xl p-4 bg-stone-50/50 flex flex-col justify-between">
                   <div>
@@ -820,26 +937,69 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                     </div>
 
                     {fotoSebelum ? (
-                      <div className="relative rounded-lg overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900 group">
-                        <img
-                          src={fotoSebelum}
-                          alt="Foto Sebelum Kegiatan"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <label className="cursor-pointer bg-white text-stone-900 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-stone-100 transition-colors">
-                            Ganti File Foto
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handlePhotoUpload(e, 'sebelum')}
-                              className="hidden"
-                            />
-                          </label>
+                      <div className="space-y-2">
+                        <div className="relative rounded-lg overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900 group">
+                          <img
+                            src={fotoSebelum}
+                            alt="Foto Sebelum Kegiatan"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={triggerUploadSebelum}
+                              className="cursor-pointer bg-white text-stone-900 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-stone-100 transition-colors shadow-md flex items-center gap-1.5"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Ganti Foto</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFotoSebelum(undefined);
+                                setSebelumMeta(null);
+                              }}
+                              className="cursor-pointer bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors shadow-md flex items-center gap-1.5"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={triggerUploadSebelum}
+                            className="text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Ganti File Foto</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFotoSebelum(undefined);
+                              setSebelumMeta(null);
+                            }}
+                            className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg font-medium cursor-pointer transition-colors"
+                          >
+                            Hapus
+                          </button>
                         </div>
                       </div>
                     ) : (
-                      <label className="border-2 border-dashed border-stone-300 hover:border-emerald-500 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/30 transition-colors">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={triggerUploadSebelum}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            triggerUploadSebelum();
+                          }
+                        }}
+                        className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/40 transition-all select-none"
+                      >
                         {isProcessingSebelum ? (
                           <div className="flex flex-col items-center gap-2">
                             <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
@@ -847,26 +1007,27 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                           </div>
                         ) : (
                           <>
-                            <Upload className="w-8 h-8 text-emerald-600/70 mb-2" />
-                            <span className="text-xs font-semibold text-stone-800 text-center">
-                              Unggah File Foto Sebelum
+                            <Upload className="w-8 h-8 text-emerald-600 mb-1.5 pointer-events-none" />
+                            <span className="text-xs font-bold text-stone-800 text-center pointer-events-none">
+                              Unggah Foto Sebelum
                             </span>
-                            <span className="text-[11px] text-stone-500 mt-1">
-                              Pilih file JPG/PNG dari perangkat
+                            <span className="text-[11px] text-stone-500 mt-0.5 pointer-events-none">
+                              Pilih file foto JPG/PNG
                             </span>
-                            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded mt-2">
-                              Resize otomatis saat diunggah
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                triggerUploadSebelum();
+                              }}
+                              className="mt-2.5 px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Camera className="w-3.5 h-3.5" />
+                              <span>Pilih Foto</span>
+                            </button>
                           </>
                         )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={isProcessingSebelum}
-                          onChange={(e) => handlePhotoUpload(e, 'sebelum')}
-                          className="hidden"
-                        />
-                      </label>
+                      </div>
                     )}
                   </div>
 
@@ -901,26 +1062,69 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                     </div>
 
                     {fotoSesudah ? (
-                      <div className="relative rounded-lg overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900 group">
-                        <img
-                          src={fotoSesudah}
-                          alt="Foto Sesudah Kegiatan"
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                          <label className="cursor-pointer bg-white text-stone-900 px-3 py-1.5 rounded-lg text-xs font-medium hover:bg-stone-100 transition-colors">
-                            Ganti File Foto
-                            <input
-                              type="file"
-                              accept="image/*"
-                              onChange={(e) => handlePhotoUpload(e, 'sesudah')}
-                              className="hidden"
-                            />
-                          </label>
+                      <div className="space-y-2">
+                        <div className="relative rounded-lg overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900 group">
+                          <img
+                            src={fotoSesudah}
+                            alt="Foto Sesudah Kegiatan"
+                            className="w-full h-full object-cover"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                              type="button"
+                              onClick={triggerUploadSesudah}
+                              className="cursor-pointer bg-white text-stone-900 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-stone-100 transition-colors shadow-md flex items-center gap-1.5"
+                            >
+                              <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
+                              <span>Ganti Foto</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setFotoSesudah(undefined);
+                                setSesudahMeta(null);
+                              }}
+                              className="cursor-pointer bg-red-600 text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-red-700 transition-colors shadow-md flex items-center gap-1.5"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                              <span>Hapus</span>
+                            </button>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between gap-2">
+                          <button
+                            type="button"
+                            onClick={triggerUploadSesudah}
+                            className="text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
+                          >
+                            <Camera className="w-3.5 h-3.5" />
+                            <span>Ganti File Foto</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFotoSesudah(undefined);
+                              setSesudahMeta(null);
+                            }}
+                            className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg font-medium cursor-pointer transition-colors"
+                          >
+                            Hapus
+                          </button>
                         </div>
                       </div>
                     ) : (
-                      <label className="border-2 border-dashed border-stone-300 hover:border-emerald-500 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/30 transition-colors">
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        onClick={triggerUploadSesudah}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            triggerUploadSesudah();
+                          }
+                        }}
+                        className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/40 transition-all select-none"
+                      >
                         {isProcessingSesudah ? (
                           <div className="flex flex-col items-center gap-2">
                             <div className="w-6 h-6 border-2 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
@@ -928,26 +1132,27 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                           </div>
                         ) : (
                           <>
-                            <Upload className="w-8 h-8 text-emerald-600/70 mb-2" />
-                            <span className="text-xs font-semibold text-stone-800 text-center">
-                              Unggah File Foto Sesudah
+                            <Upload className="w-8 h-8 text-emerald-600 mb-1.5 pointer-events-none" />
+                            <span className="text-xs font-bold text-stone-800 text-center pointer-events-none">
+                              Unggah Foto Sesudah
                             </span>
-                            <span className="text-[11px] text-stone-500 mt-1">
-                              Pilih file JPG/PNG dari perangkat
+                            <span className="text-[11px] text-stone-500 mt-0.5 pointer-events-none">
+                              Pilih file foto JPG/PNG
                             </span>
-                            <span className="text-[10px] text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded mt-2">
-                              Resize otomatis saat diunggah
-                            </span>
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                triggerUploadSesudah();
+                              }}
+                              className="mt-2.5 px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
+                            >
+                              <Camera className="w-3.5 h-3.5" />
+                              <span>Pilih Foto</span>
+                            </button>
                           </>
                         )}
-                        <input
-                          type="file"
-                          accept="image/*"
-                          disabled={isProcessingSesudah}
-                          onChange={(e) => handlePhotoUpload(e, 'sesudah')}
-                          className="hidden"
-                        />
-                      </label>
+                      </div>
                     )}
                   </div>
 
@@ -964,13 +1169,32 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row items-center justify-end gap-3 pt-2">
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm('Kosongkan semua isian form logbook sekarang?')) {
+                resetFormToEmpty();
+                scrollToTop();
+              }
+            }}
+            className="w-full sm:w-auto px-4 py-2.5 rounded-xl border border-stone-300 bg-stone-100 hover:bg-stone-200 text-stone-700 text-sm font-semibold transition-colors cursor-pointer flex items-center justify-center gap-1.5"
+            title="Bersihkan seluruh isian form"
+          >
+            <RefreshCw className="w-3.5 h-3.5 text-stone-600" />
+            <span>Kosongkan Form</span>
+          </button>
+
           {editingEntry && (
             <button
               type="button"
-              onClick={onCancelEdit}
+              onClick={() => {
+                resetFormToEmpty();
+                onCancelEdit?.();
+                scrollToTop();
+              }}
               className="w-full sm:w-auto px-5 py-2.5 rounded-xl border border-stone-300 text-stone-700 hover:bg-stone-100 text-sm font-semibold transition-colors cursor-pointer"
             >
-              Batal
+              Batal Edit
             </button>
           )}
 

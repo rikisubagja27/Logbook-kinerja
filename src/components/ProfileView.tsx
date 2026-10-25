@@ -27,6 +27,24 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
   const [toastMessage, setToastMessage] = useState('Profil Pegawai Berhasil Diperbarui!');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
+  // File input refs for reliable click triggering
+  const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const signatureFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  const triggerPhotoUpload = () => {
+    if (profilePhotoInputRef.current) {
+      profilePhotoInputRef.current.value = '';
+      profilePhotoInputRef.current.click();
+    }
+  };
+
+  const triggerSignatureUpload = () => {
+    if (signatureFileInputRef.current) {
+      signatureFileInputRef.current.value = '';
+      signatureFileInputRef.current.click();
+    }
+  };
+
   // Signature canvas
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const [isDrawing, setIsDrawing] = useState(false);
@@ -233,29 +251,34 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
                 </div>
               )}
 
-              {/* Upload Overlay */}
-              <label className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white">
-                <Camera className="w-6 h-6 mb-1" />
-                <span className="text-[10px] font-semibold">Ganti Foto</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handlePhotoUpload}
-                  className="hidden"
-                />
-              </label>
-            </div>
-
-            <label className="text-xs px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 font-medium text-stone-700 cursor-pointer flex items-center gap-1.5 transition-colors">
-              <Upload className="w-3.5 h-3.5 text-stone-500" />
-              <span>{isProcessingPhoto ? 'Memproses...' : 'Unggah Foto'}</span>
+              {/* Hidden file input */}
               <input
+                ref={profilePhotoInputRef}
                 type="file"
-                accept="image/*"
+                accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
                 onChange={handlePhotoUpload}
                 className="hidden"
               />
-            </label>
+
+              {/* Upload Overlay */}
+              <button
+                type="button"
+                onClick={triggerPhotoUpload}
+                className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center cursor-pointer text-white"
+              >
+                <Camera className="w-6 h-6 mb-1" />
+                <span className="text-[10px] font-semibold">Ganti Foto</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={triggerPhotoUpload}
+              className="text-xs px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 font-medium text-stone-700 cursor-pointer flex items-center gap-1.5 transition-colors"
+            >
+              <Upload className="w-3.5 h-3.5 text-stone-500" />
+              <span>{isProcessingPhoto ? 'Memproses...' : 'Unggah Foto'}</span>
+            </button>
           </div>
 
           {/* Core Info */}
@@ -441,16 +464,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
                 )}
               </div>
 
-              <label className="mt-2 text-xs px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 font-medium text-stone-700 cursor-pointer flex items-center gap-1.5 transition-colors">
+              {/* Hidden signature file input */}
+              <input
+                ref={signatureFileInputRef}
+                type="file"
+                accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+                onChange={handleSignatureUpload}
+                className="hidden"
+              />
+
+              <button
+                type="button"
+                onClick={triggerSignatureUpload}
+                className="mt-2 text-xs px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 font-medium text-stone-700 cursor-pointer flex items-center gap-1.5 transition-colors"
+              >
                 <Upload className="w-3.5 h-3.5 text-stone-500" />
                 <span>Unggah File Tanda Tangan</span>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleSignatureUpload}
-                  className="hidden"
-                />
-              </label>
+              </button>
             </div>
           </div>
         </div>

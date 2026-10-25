@@ -25,7 +25,9 @@ import {
   RotateCcw, 
   FileSpreadsheet,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ExternalLink,
+  CheckCircle2
 } from 'lucide-react';
 
 interface OfficialReportViewProps {
@@ -54,6 +56,13 @@ export interface Table1RowItem {
   keterangan: string;
 }
 
+export function formatNipNumberOnly(nip?: string): string {
+  if (!nip) return '-';
+  // Strip "NIP", "NIP.", "NIP:", and leading/trailing whitespace
+  const cleaned = nip.replace(/^NIP[:.\s]*/i, '').trim();
+  return cleaned || '-';
+}
+
 function formatIndonesianDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
@@ -71,13 +80,27 @@ function formatIndonesianDate(dateStr: string): string {
 }
 
 export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile }) => {
-  // Requirement: Default to 'bulanan' first!
-  const [reportConfig, setReportConfig] = useState<ReportConfig>({
-    tipe: 'bulanan',
-    tahun: 2026,
-    bulan: 7, // Juli
-    triwulan: 3,
-    tanggalCetak: '2026-07-31',
+  // Dynamic initialization based on latest entry or current date
+  const [reportConfig, setReportConfig] = useState<ReportConfig>(() => {
+    let targetDate = new Date();
+    if (entries && entries.length > 0) {
+      const sorted = [...entries].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+      if (sorted[0]?.tanggal) {
+        const parsed = new Date(sorted[0].tanggal);
+        if (!isNaN(parsed.getTime())) targetDate = parsed;
+      }
+    }
+    const year = targetDate.getFullYear();
+    const month = targetDate.getMonth() + 1;
+    const quarter = Math.ceil(month / 3);
+    const todayStr = new Date().toISOString().split('T')[0];
+    return {
+      tipe: 'bulanan',
+      tahun: year,
+      bulan: month,
+      triwulan: quarter,
+      tanggalCetak: todayStr,
+    };
   });
 
   const [isExportingDocx, setIsExportingDocx] = useState(false);
@@ -95,6 +118,56 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   const [hasCustomEdits, setHasCustomEdits] = useState(false);
 
   const reportContainerRef = useRef<HTMLDivElement | null>(null);
+  const newPhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const replacePhotoInputRef = useRef<HTMLInputElement | null>(null);
+  const [replacingPhotoIndex, setReplacingPhotoIndex] = useState<number | null>(null);
+
+  const triggerAddNewPhoto = () => {
+    if (newPhotoInputRef.current) {
+      newPhotoInputRef.current.value = '';
+      newPhotoInputRef.current.click();
+    }
+  };
+
+  const triggerReplacePhoto = (index: number) => {
+    setReplacingPhotoIndex(index);
+    if (replacePhotoInputRef.current) {
+      replacePhotoInputRef.current.value = '';
+      replacePhotoInputRef.current.click();
+    }
+  };
+
+  // Auto-synchronize report period when new entries are added so they immediately show up!
+  useEffect(() => {
+    if (entries && entries.length > 0) {
+      const sorted = [...entries].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
+      const latest = sorted[0];
+      if (latest?.tanggal) {
+        const d = new Date(latest.tanggal);
+        const latestYear = d.getFullYear();
+        const latestMonth = d.getMonth() + 1;
+
+        setReportConfig((prev) => {
+          // Check if current month in config has any entries
+          const hasCurrentMonthEntries = entries.some((e) => {
+            const ed = new Date(e.tanggal);
+            return ed.getFullYear() === prev.tahun && ed.getMonth() + 1 === prev.bulan;
+          });
+
+          // If current month has zero entries but latest month has entries, automatically switch
+          if (!hasCurrentMonthEntries) {
+            return {
+              ...prev,
+              tahun: latestYear,
+              bulan: latestMonth,
+              triwulan: Math.ceil(latestMonth / 3),
+            };
+          }
+          return prev;
+        });
+      }
+    }
+  }, [entries]);
 
   // Filter entries for this report period
   const filteredEntries = useMemo(() => {
@@ -141,7 +214,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     return `Pada ${periodText}, pelaksanaan tugas ${profile.statusKepegawaian || 'pegawai'} jabatan ${profile.jabatan || 'operasional'} telah mendukung kelancaran operasional KPS PVT I Manoko. Kegiatan utama meliputi pengolahan lahan, pemeliharaan, penyiraman, penyiangan dan pengendalian gulma, panen dan penanganan hasil panen, serta pelaksanaan uji BUSS, pembersihan area kerja, pemeliharaan sarana pendukung, dan dukungan kegiatan lainnya yang berhubungan dengan kegiatan operasional kebun. Secara umum kegiatan terlaksana secara tertib, efektif, dan sesuai dengan tugas serta mendukung pencapaian tujuan dan kelancaran tugas organisasi.\n\nDemikian laporan ini disampaikan. Atas perhatian dan kerjasamanya, diucapkan terima kasih.`;
   }, [profile, periodText]);
 
-  // Generate default Table 1 data
+  // Generate default Table 1 data - Kategori Removed, ordered clean
   const defaultTable1Data = useMemo(() => {
     const groups: Table1RowItem[] = [];
 
@@ -156,14 +229,15 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         } else if (e.kehadiran === 'Cuti') {
           itemDesc = `Cuti: ${e.keterangan || 'Cuti Resmi'}`;
         } else {
-          const parts: string[] = [];
-          if (e.kategori) parts.push(e.kategori);
-          if (e.uraianPekerjaan) parts.push(e.uraianPekerjaan);
+          let desc = e.uraianPekerjaan;
           const locDetails: string[] = [];
           if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
           if (e.luasLahan && e.luasLahan !== '-') locDetails.push(`Luas: ${e.luasLahan}`);
-          const locStr = locDetails.length > 0 ? ` (${locDetails.join(', ')})` : '';
-          itemDesc = `${parts.join(': ')}${locStr}`;
+          if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
+          if (locDetails.length > 0) {
+            desc += ` (${locDetails.join(', ')})`;
+          }
+          itemDesc = desc;
         }
 
         groups.push({
@@ -184,22 +258,18 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         const monthEntries = filteredEntries.filter(
           (e) => new Date(e.tanggal).getMonth() + 1 === m
         );
-        const map: Record<string, string[]> = {};
+        const items: string[] = [];
 
         monthEntries.forEach((e) => {
           if (e.kehadiran === 'Sakit') {
-            if (!map['Izin Sakit']) map['Izin Sakit'] = [];
-            map['Izin Sakit'].push(e.keterangan || 'Istirahat sakit');
+            items.push(`Izin Sakit: ${e.keterangan || 'Istirahat Sakit'}`);
           } else if (e.kehadiran === 'Cuti') {
-            if (!map['Cuti']) map['Cuti'] = [];
-            map['Cuti'].push(e.keterangan || 'Cuti');
+            items.push(`Cuti: ${e.keterangan || 'Cuti Resmi'}`);
           } else {
-            if (!map[e.kategori]) map[e.kategori] = [];
-            map[e.kategori].push(e.uraianPekerjaan);
+            const locInfo = e.lokasiPekerjaan && e.lokasiPekerjaan !== '-' ? ` (${e.lokasiPekerjaan})` : '';
+            items.push(`${e.uraianPekerjaan}${locInfo}`);
           }
         });
-
-        const items = Object.entries(map).map(([category, descs]) => `${category}: ${descs.join(', ')}`);
 
         groups.push({
           label: MONTH_NAMES[m - 1],
@@ -214,13 +284,11 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         const qEntries = filteredEntries.filter((e) =>
           qMonths.includes(new Date(e.tanggal).getMonth() + 1)
         );
-        const map: Record<string, number> = {};
-        qEntries.forEach((e) => {
-          const key = e.kehadiran === 'Sakit' ? 'Izin Sakit' : e.kehadiran === 'Cuti' ? 'Cuti' : e.kategori;
-          map[key] = (map[key] || 0) + 1;
+        const items = qEntries.map((e) => {
+          if (e.kehadiran === 'Sakit') return `Izin Sakit: ${e.keterangan || '-'}`;
+          if (e.kehadiran === 'Cuti') return `Cuti: ${e.keterangan || '-'}`;
+          return e.uraianPekerjaan;
         });
-
-        const items = Object.entries(map).map(([category, count]) => `${category} (${count} catatan terlaksana)`);
 
         groups.push({
           label: `Triwulan ${ROMAN_QUARTERS[q - 1]}`,
@@ -626,6 +694,18 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               <span>{isGeneratingPdf ? pdfProgress || 'Menyimpan PDF...' : 'Simpan / Unduh PDF'}</span>
             </button>
 
+            {/* Direct e-Personal Link on Top Edge */}
+            <a
+              href="https://epersonal.pertanian.go.id/login/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-md transition-all border border-emerald-400/50 cursor-pointer hover:shadow-emerald-500/25 shrink-0"
+              title="Buka portal e-Personal Kementerian Pertanian (epersonal.pertanian.go.id)"
+            >
+              <span>e-Personal Kementan</span>
+              <ExternalLink className="w-3.5 h-3.5 text-emerald-200" />
+            </a>
+
             {/* Print fallback */}
             <button
               onClick={() => window.print()}
@@ -764,6 +844,26 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         )}
       </div>
 
+      {/* Compact Real-Time Sync Indicator (Slim single-line to avoid taking up vertical space) */}
+      <div className="bg-emerald-950/70 border border-emerald-500/30 rounded-xl px-4 py-2 text-xs text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm no-print">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>
+            <strong>Sinkronisasi Otomatis:</strong> {filteredEntries.length} data kegiatan &amp; {defaultPhotos.length} foto dokumentasi periode {periodText} termuat rapi.
+          </span>
+        </div>
+        <a
+          href="https://epersonal.pertanian.go.id/login/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-300 hover:text-white transition-colors underline decoration-emerald-500/40 hover:decoration-white shrink-0"
+          title="Buka portal e-Personal Kementerian Pertanian"
+        >
+          <span>epersonal.pertanian.go.id</span>
+          <ExternalLink className="w-3 h-3 text-emerald-400" />
+        </a>
+      </div>
+
       {/* ========================================================================= */}
       {/* AUTHENTIC OFFICIAL A4 REPORT SHEETS CONTAINER */}
       {/* ========================================================================= */}
@@ -771,8 +871,18 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         
         {/* ==================== PAGE 1: COVER (SAMPUL LAPORAN) ==================== */}
         <div className="relative">
-          <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
-            — Halaman 1: Sampul Laporan Resmi —
+          <div className="no-print flex items-center justify-between text-xs text-stone-300 mb-2 px-1">
+            <span className="font-mono text-stone-400">— Halaman 1: Sampul Laporan Resmi —</span>
+            <a
+              href="https://epersonal.pertanian.go.id/login/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950/85 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white text-[11px] font-semibold transition-all shadow-xs cursor-pointer"
+              title="Akses cepat portal e-Personal Kementerian Pertanian untuk upload laporan"
+            >
+              <span>Upload ke e-Personal</span>
+              <ExternalLink className="w-3 h-3 text-emerald-400" />
+            </a>
           </div>
           <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm]">
             <div className="space-y-3 mt-4">
@@ -799,7 +909,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                 {profile.nama || 'PEGAWAI KPS PVT I MANOKO'}
               </p>
               <p className="text-base text-stone-800 font-mono tracking-wide">
-                {profile.nip ? (profile.nip.startsWith('NIP') ? profile.nip : `NIP. ${profile.nip}`) : 'NIP. -'}
+                {formatNipNumberOnly(profile.nip)}
               </p>
               <p className="text-base text-stone-700 mt-3 font-medium">
                 {profile.jabatan || 'Pengelola Pemeliharaan Kebun'}
@@ -1026,6 +1136,27 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           );
         })}
 
+        {/* Hidden inputs for adding/replacing photos in Table 2 */}
+        <input
+          ref={newPhotoInputRef}
+          type="file"
+          accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+          onChange={handleAddNewPhotoRow}
+          className="hidden"
+        />
+        <input
+          ref={replacePhotoInputRef}
+          type="file"
+          accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (file && replacingPhotoIndex !== null) {
+              handleReplacePhoto(replacingPhotoIndex, file);
+            }
+          }}
+          className="hidden"
+        />
+
         {/* ==================== PAGE 4+: TABEL 2 DOKUMENTASI KEGIATAN (2 PHOTOS PER A4 PAGE) ==================== */}
         {photoPages.length === 0 ? (
           <div className="relative">
@@ -1044,34 +1175,26 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                     </p>
                   </div>
 
-                  {isEditMode && (
-                    <label className="no-print cursor-pointer px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0">
-                      <Plus className="w-3.5 h-3.5" />
-                      <span>Tambah Baris Foto Baru</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAddNewPhotoRow}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
+                  <button
+                    type="button"
+                    onClick={triggerAddNewPhoto}
+                    className="no-print cursor-pointer px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Tambah Baris Foto Baru</span>
+                  </button>
                 </div>
 
                 <div className="p-12 border border-stone-400 text-center text-xs text-stone-500 rounded-none bg-stone-50 space-y-3">
                   <p>Belum ada dokumentasi foto sebelum untuk kegiatan pada periode ini.</p>
-                  {isEditMode && (
-                    <label className="no-print inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-800 text-white rounded-lg text-xs font-medium cursor-pointer">
-                      <Upload className="w-3.5 h-3.5" />
-                      <span>Unggah Foto Sekarang</span>
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={handleAddNewPhotoRow}
-                        className="hidden"
-                      />
-                    </label>
-                  )}
+                  <button
+                    type="button"
+                    onClick={triggerAddNewPhoto}
+                    className="no-print inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold cursor-pointer shadow-sm transition-colors"
+                  >
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Unggah Foto Dokumentasi Sekarang</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1099,17 +1222,15 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                         </p>
                       </div>
 
-                      {isEditMode && pageIdx === 0 && (
-                        <label className="no-print cursor-pointer px-3 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0">
+                      {pageIdx === 0 && (
+                        <button
+                          type="button"
+                          onClick={triggerAddNewPhoto}
+                          className="no-print cursor-pointer px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0"
+                        >
                           <Plus className="w-3.5 h-3.5" />
                           <span>Tambah Baris Foto Baru</span>
-                          <input
-                            type="file"
-                            accept="image/*"
-                            onChange={handleAddNewPhotoRow}
-                            className="hidden"
-                          />
-                        </label>
+                        </button>
                       )}
                     </div>
 
@@ -1140,37 +1261,27 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
                                     {/* Direct image edit buttons on hover */}
                                     <div className="no-print absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                                      <label className="cursor-pointer bg-white text-stone-900 px-2.5 py-1.5 rounded-md text-xs font-semibold hover:bg-stone-100 transition-colors shadow-xs flex items-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => triggerReplacePhoto(actualIdx)}
+                                        className="cursor-pointer bg-white text-stone-900 px-2.5 py-1.5 rounded-md text-xs font-semibold hover:bg-stone-100 transition-colors shadow-xs flex items-center gap-1"
+                                      >
                                         <ImageIcon className="w-3.5 h-3.5 text-emerald-700" />
                                         <span>Ganti Foto</span>
-                                        <input
-                                          type="file"
-                                          accept="image/*"
-                                          onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) handleReplacePhoto(actualIdx, file);
-                                          }}
-                                          className="hidden"
-                                        />
-                                      </label>
+                                      </button>
                                     </div>
                                   </div>
 
-                                  {/* Additional edit controls visible in edit mode */}
-                                  {isEditMode && (
-                                    <div className="no-print mt-2 flex items-center justify-center gap-2">
-                                      <label className="cursor-pointer text-[11px] font-semibold text-emerald-800 hover:text-emerald-900 bg-emerald-50 px-2 py-1 rounded border border-emerald-200">
-                                        Ganti Foto
-                                        <input
-                                          type="file"
-                                          accept="image/*"
-                                          onChange={(e) => {
-                                            const file = e.target.files?.[0];
-                                            if (file) handleReplacePhoto(actualIdx, file);
-                                          }}
-                                          className="hidden"
-                                        />
-                                      </label>
+                                  {/* Additional edit controls visible in edit mode or direct */}
+                                  <div className="no-print mt-2 flex items-center justify-center gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => triggerReplacePhoto(actualIdx)}
+                                      className="cursor-pointer text-[11px] font-semibold text-emerald-800 hover:text-emerald-900 bg-emerald-50 px-2 py-1 rounded border border-emerald-200"
+                                    >
+                                      Ganti Foto
+                                    </button>
+                                    {isEditMode && (
                                       <button
                                         type="button"
                                         onClick={() => handleDeletePhotoRow(actualIdx)}
@@ -1179,8 +1290,8 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                         <Trash2 className="w-3 h-3" />
                                         <span>Hapus</span>
                                       </button>
-                                    </div>
-                                  )}
+                                    )}
+                                  </div>
                                 </td>
 
                                 {/* Keterangan Cell */}
@@ -1309,7 +1420,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                   {profile.nama || 'PEGAWAI KPS PVT I MANOKO'}
                 </p>
                 <p className="font-mono text-xs text-stone-800">
-                  {profile.nip ? (profile.nip.startsWith('NIP') ? profile.nip : `NIP. ${profile.nip}`) : 'NIP. -'}
+                  {formatNipNumberOnly(profile.nip)}
                 </p>
               </div>
             </div>
