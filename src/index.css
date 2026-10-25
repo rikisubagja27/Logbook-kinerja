@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  }
+}
+
+/* App Background with uploaded image */
+.app-bg-gradient {
+  background-image: url('/assets/aistudio/227315dcaa73d0c772e73e49c5876675_e87d568d.jpg');
+  background-size: cover;
+  background-position: center;
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  min-height: 100vh;
+}
+
+/* Explicit standard Hex / RGB styles on report pages to guarantee html2canvas compatibility */
+/* Explicit standard Hex / RGB styles on report pages to guarantee html2canvas compatibility & authentic kedinasan look */
+.report-page,
+.report-page * {
+  box-sizing: border-box;
+}
+
+.report-page {
+  font-family: Arial, 'Helvetica Neue', Helvetica, sans-serif !important;
+  background-color: #ffffff !important;
+  color: #111827 !important;
+  line-height: 1.5;
+}
+
+.report-page h1,
+.report-page h2,
+.report-page h3,
+.report-page h4,
+.report-page h5,
+.report-page .report-title,
+.report-page th {
+  font-family: 'Arial MT', Arial, 'Helvetica Neue', Helvetica, sans-serif !important;
+  color: #000000 !important;
+  letter-spacing: normal;
+}
+
+.report-page table {
+  border: 1px solid #000000 !important;
+  border-collapse: collapse !important;
+  background-color: #ffffff !important;
+  width: 100% !important;
+}
+
+.report-page th {
+  background-color: #f3f4f6 !important;
+  color: #000000 !important;
+  border: 1px solid #000000 !important;
+  font-weight: 700 !important;
+  padding: 6px 8px !important;
+}
+
+.report-page td {
+  border: 1px solid #000000 !important;
+  color: #111827 !important;
+  background-color: #ffffff !important;
+  padding: 6px 8px !important;
+}
+
+/* Custom styles for A4 Report Preview & Print */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt;
+    line-height: 1.5;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  .report-page {
+    width: 210mm !important;
+    min-height: 297mm !important;
+    padding: 25mm 25mm 25mm 30mm !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: #ffffff !important;
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  table {
+    page-break-inside: auto;
+  }
+
+  tr {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 15mm 20mm 15mm 25mm;
+  }
+}
+
+/* A4 Screen Display Mode */
+.a4-page-preview {
+  width: 210mm;
+  min-height: 297mm;
+  box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3), 0 4px 12px -2px rgba(0, 0, 0, 0.2);
+}

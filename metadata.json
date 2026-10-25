@@ -1,0 +1,6 @@
+{
+  "name": "Logbook Kinerja Kps 1 manoko",
+  "description": "Aplikasi Logbook Kinerja Harian dan Pembuatan Laporan Resmi Operasional Kantor KPS PVT 1 Manoko - Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
