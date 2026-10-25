@@ -1,23 +1,11 @@
 export type AttendanceStatus = 'WFO' | 'Sakit' | 'Cuti';
 
-export type JobCategory = 
-  | 'Pengolahan Lahan & Persiapan Tanam'
-  | 'Pemeliharaan & Sanitasi'
-  | 'Penanaman & Persemaian'
-  | 'Uji BUSS'
-  | 'Panen & Pasca Panen'
-  | 'Pemupukan & Saprodi'
-  | 'Sarana / Administrasi'
-  | 'Dukungan Operasional & Kedinasan'
-  | 'Lainnya';
-
 export interface LogbookEntry {
   id: string;
   tanggal: string; // YYYY-MM-DD
   kehadiran: AttendanceStatus;
   waktuMulai: string; // HH:mm e.g. "07:30"
   waktuSelesai: string; // HH:mm e.g. "16:00"
-  kategori: JobCategory;
   uraianPekerjaan: string;
   lokasiPekerjaan: string;
   luasLahan: string; // e.g. "1.200 m²", "800 m²", "-"
