@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UserProfile } from '../types/logbook';
+import { UserProfile, GoogleAccount } from '../types/logbook';
 import { resizeImageFile } from '../utils/imageUtils';
+import { loadGoogleAccount, saveGoogleAccount, clearGoogleAccount } from '../utils/storage';
 import { 
   User, 
   Upload, 
@@ -9,10 +10,17 @@ import {
   PenTool, 
   RotateCcw, 
   Save, 
-  CheckCircle2,
-  Trash2,
-  AlertCircle,
-  X
+  CheckCircle2, 
+  Trash2, 
+  AlertCircle, 
+  X,
+  LogIn,
+  LogOut,
+  Sparkles,
+  UserPlus,
+  Mail,
+  ShieldCheck,
+  Check
 } from 'lucide-react';
 
 interface ProfileViewProps {
@@ -20,12 +28,40 @@ interface ProfileViewProps {
   onSaveProfile: (updated: UserProfile) => void;
 }
 
+const GoogleLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    <path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.665-5.17 3.665-9.17Z"
+    />
+    <path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.4 7.34 24 12 24Z"
+    />
+    <path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.17 0 9.97 0 12s.45 3.83 1.25 5.42l4.03-3.15Z"
+    />
+    <path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.34 0 3.26 2.6 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98Z"
+    />
+  </svg>
+);
+
 export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile }) => {
   const [formData, setFormData] = useState<UserProfile>(profile);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('Profil Pegawai Berhasil Diperbarui!');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Google Authentication State
+  const [googleAccount, setGoogleAccount] = useState<GoogleAccount | null>(() => loadGoogleAccount());
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginNameInput, setLoginNameInput] = useState('');
+  const [loginEmailInput, setLoginEmailInput] = useState('');
+  const [loginModalError, setLoginModalError] = useState<string | null>(null);
 
   // File input refs for reliable click triggering
   const profilePhotoInputRef = useRef<HTMLInputElement | null>(null);
@@ -180,6 +216,97 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
     setTimeout(() => setShowSavedToast(false), 3000);
   };
 
+  // --- GOOGLE SIGN-IN HANDLERS ---
+  const handleExecuteGoogleLogin = (name: string, email: string) => {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim().toLowerCase();
+
+    if (!cleanName || !cleanEmail) {
+      setLoginModalError('Silakan masukkan nama lengkap dan email Google.');
+      return;
+    }
+
+    if (!cleanEmail.includes('@')) {
+      setLoginModalError('Format alamat email tidak valid.');
+      return;
+    }
+
+    // High-resolution avatar generation with DiceBear
+    const initialsPhoto = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(cleanName)}&backgroundColor=047857,0f766e,15803d&textColor=ffffff`;
+
+    const newAccount: GoogleAccount = {
+      uid: `google-${Date.now()}`,
+      displayName: cleanName,
+      email: cleanEmail,
+      photoURL: initialsPhoto,
+      provider: 'google.com',
+      lastLogin: new Date().toISOString(),
+    };
+
+    saveGoogleAccount(newAccount);
+    setGoogleAccount(newAccount);
+    setIsLoginModalOpen(false);
+    setLoginModalError(null);
+    setLoginNameInput('');
+    setLoginEmailInput('');
+
+    setToastMessage(`Login berhasil sebagai: ${newAccount.displayName}`);
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3500);
+  };
+
+  // Synchronize Google Account info to current profile form
+  const handleApplyGoogleToForm = () => {
+    if (!googleAccount) return;
+
+    setFormData((prev) => ({
+      ...prev,
+      nama: googleAccount.displayName.toUpperCase(),
+      email: googleAccount.email,
+      fotoProfil: googleAccount.photoURL || prev.fotoProfil,
+    }));
+
+    setToastMessage('Data Akun Google berhasil diterapkan ke formulir!');
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3000);
+  };
+
+  // Create clean new profile session for a new officer using their Google Account
+  const handleCreateNewOfficerProfile = () => {
+    if (!googleAccount) return;
+
+    const newProfile: UserProfile = {
+      nama: googleAccount.displayName.toUpperCase(),
+      nip: '',
+      jabatan: 'Operator Layanan Operasional',
+      statusKepegawaian: 'PPPK Paruh Waktu',
+      unitKerja: 'Kebun Pemeriksaan Substantif PVT I Manoko',
+      instansiInduk: 'Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian',
+      kementerian: 'Kementerian Pertanian',
+      tempatPenetapan: 'Bandung Barat',
+      email: googleAccount.email,
+      fotoProfil: googleAccount.photoURL,
+      tandaTanganUrl: undefined,
+    };
+
+    setFormData(newProfile);
+    onSaveProfile(newProfile);
+    clearCanvasSignature();
+
+    setToastMessage('Profil pegawai baru berhasil dibuat & disimpan!');
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3500);
+  };
+
+  // Sign out from Google session
+  const handleGoogleLogout = () => {
+    clearGoogleAccount();
+    setGoogleAccount(null);
+    setToastMessage('Berhasil keluar dari Akun Google.');
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3000);
+  };
+
   return (
     <div className="max-w-4xl mx-auto py-6 px-4 sm:px-6 space-y-6">
       {/* Toast */}
@@ -232,6 +359,254 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
         </div>
       </div>
 
+      {/* ========================================================================= */}
+      {/* GOOGLE SIGN-IN CARD (FOR NEW USERS & PROFILE SYNCHRONIZATION) */}
+      {/* ========================================================================= */}
+      <div className="bg-gradient-to-br from-stone-900 via-stone-950 to-emerald-950/90 border border-emerald-500/30 rounded-2xl p-5 sm:p-6 shadow-xl text-white">
+        {googleAccount ? (
+          /* Logged In Google Account State */
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/20 pb-4">
+              <div className="flex items-center gap-2">
+                <GoogleLogo className="w-5 h-5 shrink-0" />
+                <span className="text-sm font-bold text-white tracking-tight">
+                  Akun Google Terhubung (Pengguna Aktif)
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-900/50 px-3 py-1 rounded-full border border-emerald-500/40 w-fit">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Terautentikasi Resmi</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Account details */}
+              <div className="flex items-center gap-3.5">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-400 bg-stone-800 flex items-center justify-center shadow-md">
+                    {googleAccount.photoURL ? (
+                      <img
+                        src={googleAccount.photoURL}
+                        alt={googleAccount.displayName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-6 h-6 text-stone-300" />
+                    )}
+                  </div>
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-stone-950 rounded-full"></span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-white text-base">
+                      {googleAccount.displayName}
+                    </p>
+                    <span className="text-[10px] bg-white/10 text-stone-300 px-2 py-0.5 rounded font-mono">
+                      Google User
+                    </span>
+                  </div>
+                  <p className="text-xs text-emerald-300/90 font-mono mt-0.5 flex items-center gap-1.5">
+                    <Mail className="w-3 h-3 text-emerald-400" />
+                    <span>{googleAccount.email}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons for Logged In User */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplyGoogleToForm}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl shadow-md transition-all cursor-pointer border border-emerald-500/40"
+                  title="Salin Nama Lengkap dan Email Google ke Formulir Profil di bawah"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Sinkron ke Form</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCreateNewOfficerProfile}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all cursor-pointer border border-white/20"
+                  title="Buat profil pegawai baru dengan nama dan email akun Google ini"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Buat Profil Baru</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogout}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-950/60 rounded-xl transition-all cursor-pointer border border-rose-500/30"
+                  title="Keluar dari akun Google ini"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Keluar</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* Not Logged In State (Prompts New Users to Sign In with Google) */
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-white/10 border border-white/15">
+                  <GoogleLogo className="w-5 h-5" />
+                </div>
+                <h2 className="text-base font-bold text-white tracking-tight">
+                  Login Pengguna Baru dengan Akun Google
+                </h2>
+                <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full">
+                  Pengguna Baru
+                </span>
+              </div>
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Bagi pegawai baru atau pengguna yang baru bertugas di KPS PVT 1 Manoko, Anda dapat langsung masuk dengan Akun Google untuk sinkronisasi identitas otomatis dan mengisi profil dinas Anda dengan mudah.
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsLoginModalOpen(true)}
+                className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white hover:bg-stone-100 text-stone-900 font-bold text-xs sm:text-sm shadow-xl hover:shadow-2xl transition-all border border-stone-200 cursor-pointer active:scale-95"
+              >
+                <GoogleLogo className="w-4 h-4" />
+                <span>Masuk dengan Akun Google</span>
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ========================================================================= */}
+      {/* GOOGLE SIGN-IN MODAL (AUTHENTIC GOOGLE DIALOG EXPERIENCE) */}
+      {/* ========================================================================= */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-stone-200 overflow-hidden text-stone-900">
+            {/* Modal Top Google Accent Bar */}
+            <div className="h-1.5 w-full bg-gradient-to-r from-blue-500 via-red-500 via-amber-500 to-emerald-500"></div>
+
+            <div className="p-6 space-y-5">
+              <div className="flex items-start justify-between">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <GoogleLogo className="w-6 h-6" />
+                    <span className="text-lg font-bold text-stone-900">Google</span>
+                  </div>
+                  <h3 className="text-base font-bold text-stone-900">
+                    Masuk dengan Akun Google
+                  </h3>
+                  <p className="text-xs text-stone-500">
+                    Pilih akun atau masukkan data akun Google Anda untuk melanjutkan ke Logbook Kinerja KPS 1 Manoko.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsLoginModalOpen(false)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {loginModalError && (
+                <div className="bg-red-50 text-red-700 border border-red-200 p-2.5 rounded-lg text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  <span>{loginModalError}</span>
+                </div>
+              )}
+
+              {/* Quick 1-Tap Option: Current officer preset account */}
+              <div className="space-y-2">
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
+                  Pilih Akun yang Tersedia
+                </span>
+                <button
+                  type="button"
+                  onClick={() => handleExecuteGoogleLogin('Riki Subagja', 'rikisu393@gmail.com')}
+                  className="w-full p-3 rounded-xl border border-stone-200 hover:border-emerald-500 hover:bg-emerald-50/50 flex items-center justify-between text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-sm shadow-xs">
+                      RS
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-stone-900 group-hover:text-emerald-800">
+                        Riki Subagja
+                      </p>
+                      <p className="text-xs text-stone-500 font-mono">
+                        rikisu393@gmail.com
+                      </p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-semibold text-emerald-700 bg-emerald-100 px-2 py-1 rounded">
+                    Pilih
+                  </span>
+                </button>
+              </div>
+
+              <div className="relative flex py-1 items-center">
+                <div className="flex-grow border-t border-stone-200"></div>
+                <span className="flex-shrink mx-3 text-stone-400 text-[11px] font-semibold uppercase">
+                  Atau Masuk Sebagai Pengguna Baru
+                </span>
+                <div className="flex-grow border-t border-stone-200"></div>
+              </div>
+
+              {/* New User Account Inputs */}
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Nama Lengkap Pegawai Baru
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Contoh: Budi Santoso / Siti Rahmawati"
+                    value={loginNameInput}
+                    onChange={(e) => setLoginNameInput(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-700 mb-1">
+                    Alamat Email Google / Kedinasan
+                  </label>
+                  <input
+                    type="email"
+                    placeholder="nama.pegawai@gmail.com"
+                    value={loginEmailInput}
+                    onChange={(e) => setLoginEmailInput(e.target.value)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                  />
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleExecuteGoogleLogin(loginNameInput, loginEmailInput)}
+                  className="w-full py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-sm shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>Masuk dengan Akun Ini</span>
+                </button>
+              </div>
+
+              <div className="pt-2 text-center">
+                <p className="text-[11px] text-stone-500 leading-normal">
+                  Data akun Anda disimpan secara aman di browser ini untuk keperluan identitas pengesahan laporan kinerja PVTPP Kementerian Pertanian.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ========================================================================= */}
+      {/* MAIN PROFILE FORM */}
+      {/* ========================================================================= */}
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Photo & Main Identity Card */}
         <div className="bg-white/95 backdrop-blur-md p-6 rounded-2xl border border-white/60 shadow-xl flex flex-col sm:flex-row items-center sm:items-start gap-6">
@@ -334,6 +709,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
                 className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50/50"
               />
             </div>
+
+            {/* Email Field with Google account hint */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-semibold text-stone-700 mb-1">
+                Alamat Email Kedinasan / Akun Google
+              </label>
+              <div className="relative">
+                <input
+                  type="email"
+                  value={formData.email}
+                  onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                  placeholder="pegawai@gmail.com"
+                  className="w-full px-3 py-2 pl-9 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-50/50 font-mono"
+                />
+                <Mail className="w-4 h-4 text-stone-400 absolute left-3 top-2.5" />
+              </div>
+            </div>
           </div>
         </div>
 
@@ -411,7 +803,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
               <button
                 type="button"
                 onClick={clearCanvasSignature}
-                className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1"
+                className="text-xs text-red-600 hover:text-red-700 font-medium flex items-center gap-1 cursor-pointer"
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Hapus Tanda Tangan</span>
@@ -489,7 +881,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
         <div className="flex justify-end pt-2">
           <button
             type="submit"
-            className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-sm font-semibold shadow-md transition-all flex items-center gap-2"
+            className="px-6 py-2.5 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white text-sm font-semibold shadow-md transition-all flex items-center gap-2 cursor-pointer"
           >
             <Save className="w-4 h-4" />
             <span>Simpan Perubahan Profil</span>

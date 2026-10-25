@@ -1,7 +1,8 @@
-import { LogbookEntry, UserProfile } from '../types/logbook';
+import { LogbookEntry, UserProfile, GoogleAccount } from '../types/logbook';
 
 const LOGBOOK_STORAGE_KEY = 'kps1_manoko_logbook_entries_v1';
 const PROFILE_STORAGE_KEY = 'kps1_manoko_user_profile_v1';
+const GOOGLE_AUTH_STORAGE_KEY = 'kps1_manoko_google_auth_v1';
 
 export const DEFAULT_USER_PROFILE: UserProfile = {
   nama: 'RIKI SUBAGJA',
@@ -357,3 +358,31 @@ export function saveUserProfile(profile: UserProfile): void {
     console.error('Error saving user profile:', err);
   }
 }
+
+export function loadGoogleAccount(): GoogleAccount | null {
+  try {
+    const raw = localStorage.getItem(GOOGLE_AUTH_STORAGE_KEY);
+    if (!raw) return null;
+    return JSON.parse(raw);
+  } catch (err) {
+    console.error('Error loading Google account:', err);
+    return null;
+  }
+}
+
+export function saveGoogleAccount(account: GoogleAccount): void {
+  try {
+    localStorage.setItem(GOOGLE_AUTH_STORAGE_KEY, JSON.stringify(account));
+  } catch (err) {
+    console.error('Error saving Google account:', err);
+  }
+}
+
+export function clearGoogleAccount(): void {
+  try {
+    localStorage.removeItem(GOOGLE_AUTH_STORAGE_KEY);
+  } catch (err) {
+    console.error('Error clearing Google account:', err);
+  }
+}
+

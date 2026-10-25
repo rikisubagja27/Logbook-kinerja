@@ -276,38 +276,39 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     setWaktuSelesai(end);
   };
 
-  // Upload Surat Sakit
-  const handleSuratSakitUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  // Upload & Process Surat Sakit
+  const processSuratFile = async (file: File) => {
     if (!file) return;
-
     try {
       setIsProcessingSurat(true);
       const result = await resizeImageFile(file, 1200, 0.85);
-      const meta = `Ukuran: ${formatBytes(result.originalSize)} ➔ ${formatBytes(result.newSize)} (Resize otomatis ${result.width}×${result.height}px)`;
+      const meta = `Ukuran: ${formatBytes(result.originalSize)} ➔ ${formatBytes(result.newSize)} (${result.width}×${result.height}px)`;
       setSuratSakit(result.dataUrl);
       setSuratSakitMeta(meta);
     } catch (err: any) {
+      console.error('Error processing surat file:', err);
       alert('Gagal memproses gambar surat sakit: ' + (err.message || 'Format tidak didukung'));
     } finally {
       setIsProcessingSurat(false);
     }
   };
 
-  // Upload Field Photo (Sebelum & Sesudah)
-  const handlePhotoUpload = async (
-    e: React.ChangeEvent<HTMLInputElement>,
-    type: 'sebelum' | 'sesudah'
-  ) => {
+  const handleSuratSakitUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (file) {
+      processSuratFile(file);
+    }
+  };
 
+  // Upload & Process Field Photo (Sebelum & Sesudah)
+  const processPhotoFile = async (file: File, type: 'sebelum' | 'sesudah') => {
+    if (!file) return;
     if (type === 'sebelum') setIsProcessingSebelum(true);
     else setIsProcessingSesudah(true);
 
     try {
       const result = await resizeImageFile(file, 1080, 0.8);
-      const metaInfo = `Ukuran: ${formatBytes(result.originalSize)} ➔ ${formatBytes(result.newSize)} (Resize otomatis ${result.width}×${result.height}px)`;
+      const metaInfo = `Ukuran: ${formatBytes(result.originalSize)} ➔ ${formatBytes(result.newSize)} (${result.width}×${result.height}px)`;
 
       if (type === 'sebelum') {
         setFotoSebelum(result.dataUrl);
@@ -317,10 +318,21 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
         setSesudahMeta(metaInfo);
       }
     } catch (err: any) {
+      console.error('Error processing photo:', err);
       alert('Gagal memproses gambar: ' + (err.message || 'Format tidak didukung'));
     } finally {
       if (type === 'sebelum') setIsProcessingSebelum(false);
       else setIsProcessingSesudah(false);
+    }
+  };
+
+  const handlePhotoUpload = (
+    e: React.ChangeEvent<HTMLInputElement>,
+    type: 'sebelum' | 'sesudah'
+  ) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      processPhotoFile(file, type);
     }
   };
 
@@ -662,14 +674,18 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                 )}
               </div>
 
-              {/* Hidden file input controlled via ref */}
+              {/* Native accessible file input */}
               <input
+                id="surat-sakit-input"
                 ref={fileInputSuratRef}
                 type="file"
-                accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+                accept="image/*"
                 disabled={isProcessingSurat}
                 onChange={handleSuratSakitUpload}
-                className="hidden"
+                onClick={(e) => {
+                  (e.currentTarget as HTMLInputElement).value = '';
+                }}
+                className="sr-only"
               />
 
               {suratSakit ? (
@@ -681,14 +697,13 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                       className="max-h-[290px] w-auto object-contain mx-auto"
                     />
                     <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                      <button
-                        type="button"
-                        onClick={triggerUploadSurat}
+                      <label
+                        htmlFor="surat-sakit-input"
                         className="cursor-pointer bg-white text-stone-900 px-3.5 py-2 rounded-lg text-xs font-semibold hover:bg-stone-100 transition-colors shadow-md flex items-center gap-1.5"
                       >
                         <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
                         <span>Ganti Surat Sakit</span>
-                      </button>
+                      </label>
                       <button
                         type="button"
                         onClick={() => {
@@ -702,6 +717,25 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                       </button>
                     </div>
                   </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <label
+                      htmlFor="surat-sakit-input"
+                      className="cursor-pointer text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-medium flex items-center gap-1.5 transition-colors"
+                    >
+                      <Upload className="w-3.5 h-3.5 text-emerald-700" />
+                      <span>Ganti File Surat</span>
+                    </label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSuratSakit(undefined);
+                        setSuratSakitMeta(null);
+                      }}
+                      className="text-xs px-3 py-1.5 text-red-600 hover:bg-red-50 rounded-lg font-medium cursor-pointer transition-colors"
+                    >
+                      Hapus
+                    </button>
+                  </div>
                   {suratSakitMeta && (
                     <div className="text-[11px] text-emerald-800 font-mono bg-emerald-50/80 p-1.5 rounded border border-emerald-100">
                       {suratSakitMeta}
@@ -709,17 +743,15 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                   )}
                 </div>
               ) : (
-                <div
-                  role="button"
-                  tabIndex={0}
-                  onClick={triggerUploadSurat}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.preventDefault();
-                      triggerUploadSurat();
-                    }
+                <label
+                  htmlFor="surat-sakit-input"
+                  onDragOver={(e) => e.preventDefault()}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const file = e.dataTransfer.files?.[0];
+                    if (file) processSuratFile(file);
                   }}
-                  className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50/40 transition-all select-none"
+                  className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg p-6 flex flex-col items-center justify-center cursor-pointer hover:bg-emerald-50/50 transition-all select-none group"
                 >
                   {isProcessingSurat ? (
                     <div className="flex flex-col items-center gap-2">
@@ -728,27 +760,20 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                     </div>
                   ) : (
                     <>
-                      <Upload className="w-8 h-8 text-emerald-600 mb-2 pointer-events-none" />
+                      <Upload className="w-8 h-8 text-emerald-600 mb-2 group-hover:scale-110 transition-transform pointer-events-none" />
                       <span className="text-xs font-bold text-stone-800 text-center pointer-events-none">
                         Unggah Foto Surat Keterangan Sakit / Dokter
                       </span>
                       <span className="text-[11px] text-stone-500 mt-1 pointer-events-none">
-                        Pilih foto atau hasil pindai dokumen (JPG/PNG)
+                        Klik untuk memilih file foto / scan surat dari galeri atau kamera
                       </span>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          triggerUploadSurat();
-                        }}
-                        className="mt-3 px-4 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                      >
+                      <span className="mt-3 px-4 py-2 rounded-lg bg-emerald-700 group-hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 pointer-events-none transition-colors">
                         <Upload className="w-3.5 h-3.5" />
                         <span>Pilih File Surat Dokter</span>
-                      </button>
+                      </span>
                     </>
                   )}
-                </div>
+                </label>
               )}
             </div>
           </div>
@@ -895,22 +920,30 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
-                {/* Hidden File Inputs controlled via refs */}
+                {/* Native accessible File Inputs */}
                 <input
+                  id="foto-sebelum-input"
                   ref={fileInputSebelumRef}
                   type="file"
-                  accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+                  accept="image/*"
                   disabled={isProcessingSebelum}
                   onChange={(e) => handlePhotoUpload(e, 'sebelum')}
-                  className="hidden"
+                  onClick={(e) => {
+                    (e.currentTarget as HTMLInputElement).value = '';
+                  }}
+                  className="sr-only"
                 />
                 <input
+                  id="foto-sesudah-input"
                   ref={fileInputSesudahRef}
                   type="file"
-                  accept="image/*,image/jpeg,image/png,image/webp,image/jpg"
+                  accept="image/*"
                   disabled={isProcessingSesudah}
                   onChange={(e) => handlePhotoUpload(e, 'sesudah')}
-                  className="hidden"
+                  onClick={(e) => {
+                    (e.currentTarget as HTMLInputElement).value = '';
+                  }}
+                  className="sr-only"
                 />
 
                 {/* Foto Sebelum */}
@@ -945,14 +978,13 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={triggerUploadSebelum}
+                            <label
+                              htmlFor="foto-sebelum-input"
                               className="cursor-pointer bg-white text-stone-900 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-stone-100 transition-colors shadow-md flex items-center gap-1.5"
                             >
                               <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
                               <span>Ganti Foto</span>
-                            </button>
+                            </label>
                             <button
                               type="button"
                               onClick={() => {
@@ -967,14 +999,13 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={triggerUploadSebelum}
+                          <label
+                            htmlFor="foto-sebelum-input"
                             className="text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
                           >
                             <Camera className="w-3.5 h-3.5" />
                             <span>Ganti File Foto</span>
-                          </button>
+                          </label>
                           <button
                             type="button"
                             onClick={() => {
@@ -988,17 +1019,15 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={triggerUploadSebelum}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            triggerUploadSebelum();
-                          }
+                      <label
+                        htmlFor="foto-sebelum-input"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) processPhotoFile(file, 'sebelum');
                         }}
-                        className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/40 transition-all select-none"
+                        className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/50 transition-all select-none group"
                       >
                         {isProcessingSebelum ? (
                           <div className="flex flex-col items-center gap-2">
@@ -1007,27 +1036,20 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                           </div>
                         ) : (
                           <>
-                            <Upload className="w-8 h-8 text-emerald-600 mb-1.5 pointer-events-none" />
+                            <Upload className="w-8 h-8 text-emerald-600 mb-1.5 group-hover:scale-110 transition-transform pointer-events-none" />
                             <span className="text-xs font-bold text-stone-800 text-center pointer-events-none">
                               Unggah Foto Sebelum
                             </span>
-                            <span className="text-[11px] text-stone-500 mt-0.5 pointer-events-none">
-                              Pilih file foto JPG/PNG
+                            <span className="text-[11px] text-stone-500 mt-0.5 pointer-events-none text-center">
+                              Pilih file foto JPG/PNG dari galeri atau kamera
                             </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerUploadSebelum();
-                              }}
-                              className="mt-2.5 px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                            >
+                            <span className="mt-2.5 px-3.5 py-1.5 rounded-lg bg-emerald-700 group-hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 pointer-events-none transition-colors">
                               <Camera className="w-3.5 h-3.5" />
                               <span>Pilih Foto</span>
-                            </button>
+                            </span>
                           </>
                         )}
-                      </div>
+                      </label>
                     )}
                   </div>
 
@@ -1070,14 +1092,13 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                             className="w-full h-full object-cover"
                           />
                           <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                            <button
-                              type="button"
-                              onClick={triggerUploadSesudah}
+                            <label
+                              htmlFor="foto-sesudah-input"
                               className="cursor-pointer bg-white text-stone-900 px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-stone-100 transition-colors shadow-md flex items-center gap-1.5"
                             >
                               <RefreshCw className="w-3.5 h-3.5 text-emerald-700" />
                               <span>Ganti Foto</span>
-                            </button>
+                            </label>
                             <button
                               type="button"
                               onClick={() => {
@@ -1092,14 +1113,13 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                           </div>
                         </div>
                         <div className="flex items-center justify-between gap-2">
-                          <button
-                            type="button"
-                            onClick={triggerUploadSesudah}
+                          <label
+                            htmlFor="foto-sesudah-input"
                             className="text-xs px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 rounded-lg font-medium flex items-center gap-1.5 cursor-pointer transition-colors"
                           >
                             <Camera className="w-3.5 h-3.5" />
                             <span>Ganti File Foto</span>
-                          </button>
+                          </label>
                           <button
                             type="button"
                             onClick={() => {
@@ -1113,17 +1133,15 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                         </div>
                       </div>
                     ) : (
-                      <div
-                        role="button"
-                        tabIndex={0}
-                        onClick={triggerUploadSesudah}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            triggerUploadSesudah();
-                          }
+                      <label
+                        htmlFor="foto-sesudah-input"
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault();
+                          const file = e.dataTransfer.files?.[0];
+                          if (file) processPhotoFile(file, 'sesudah');
                         }}
-                        className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/40 transition-all select-none"
+                        className="border-2 border-dashed border-stone-300 hover:border-emerald-600 rounded-lg aspect-4/3 flex flex-col items-center justify-center p-4 cursor-pointer hover:bg-emerald-50/50 transition-all select-none group"
                       >
                         {isProcessingSesudah ? (
                           <div className="flex flex-col items-center gap-2">
@@ -1132,27 +1150,20 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                           </div>
                         ) : (
                           <>
-                            <Upload className="w-8 h-8 text-emerald-600 mb-1.5 pointer-events-none" />
+                            <Upload className="w-8 h-8 text-emerald-600 mb-1.5 group-hover:scale-110 transition-transform pointer-events-none" />
                             <span className="text-xs font-bold text-stone-800 text-center pointer-events-none">
                               Unggah Foto Sesudah
                             </span>
-                            <span className="text-[11px] text-stone-500 mt-0.5 pointer-events-none">
-                              Pilih file foto JPG/PNG
+                            <span className="text-[11px] text-stone-500 mt-0.5 pointer-events-none text-center">
+                              Pilih file foto JPG/PNG dari galeri atau kamera
                             </span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                triggerUploadSesudah();
-                              }}
-                              className="mt-2.5 px-3.5 py-1.5 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 cursor-pointer"
-                            >
+                            <span className="mt-2.5 px-3.5 py-1.5 rounded-lg bg-emerald-700 group-hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs flex items-center gap-1.5 pointer-events-none transition-colors">
                               <Camera className="w-3.5 h-3.5" />
                               <span>Pilih Foto</span>
-                            </button>
+                            </span>
                           </>
                         )}
-                      </div>
+                      </label>
                     )}
                   </div>
 

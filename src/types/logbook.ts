@@ -52,3 +52,13 @@ export interface ReportConfig {
   triwulan: number; // 1-4 (for triwulan)
   tanggalCetak: string; // YYYY-MM-DD
 }
+
+export interface GoogleAccount {
+  uid: string;
+  displayName: string;
+  email: string;
+  photoURL?: string;
+  provider: 'google.com';
+  lastLogin: string;
+}
+

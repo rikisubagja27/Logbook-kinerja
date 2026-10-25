@@ -26,7 +26,6 @@ import {
   FileSpreadsheet,
   FileText,
   Image as ImageIcon,
-  ExternalLink,
   CheckCircle2
 } from 'lucide-react';
 
@@ -694,17 +693,6 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               <span>{isGeneratingPdf ? pdfProgress || 'Menyimpan PDF...' : 'Simpan / Unduh PDF'}</span>
             </button>
 
-            {/* Direct e-Personal Link on Top Edge */}
-            <a
-              href="https://epersonal.pertanian.go.id/login/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-semibold shadow-md transition-all border border-emerald-400/50 cursor-pointer hover:shadow-emerald-500/25 shrink-0"
-              title="Buka portal e-Personal Kementerian Pertanian (epersonal.pertanian.go.id)"
-            >
-              <span>e-Personal Kementan</span>
-              <ExternalLink className="w-3.5 h-3.5 text-emerald-200" />
-            </a>
 
             {/* Print fallback */}
             <button
@@ -845,23 +833,11 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       </div>
 
       {/* Compact Real-Time Sync Indicator (Slim single-line to avoid taking up vertical space) */}
-      <div className="bg-emerald-950/70 border border-emerald-500/30 rounded-xl px-4 py-2 text-xs text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2 shadow-sm no-print">
-        <div className="flex items-center gap-2">
-          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-          <span>
-            <strong>Sinkronisasi Otomatis:</strong> {filteredEntries.length} data kegiatan &amp; {defaultPhotos.length} foto dokumentasi periode {periodText} termuat rapi.
-          </span>
-        </div>
-        <a
-          href="https://epersonal.pertanian.go.id/login/"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-300 hover:text-white transition-colors underline decoration-emerald-500/40 hover:decoration-white shrink-0"
-          title="Buka portal e-Personal Kementerian Pertanian"
-        >
-          <span>epersonal.pertanian.go.id</span>
-          <ExternalLink className="w-3 h-3 text-emerald-400" />
-        </a>
+      <div className="bg-emerald-950/70 border border-emerald-500/30 rounded-xl px-4 py-2 text-xs text-emerald-200 flex items-center gap-2 shadow-sm no-print">
+        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+        <span>
+          <strong>Sinkronisasi Otomatis:</strong> {filteredEntries.length} data kegiatan &amp; {defaultPhotos.length} foto dokumentasi periode {periodText} termuat rapi.
+        </span>
       </div>
 
       {/* ========================================================================= */}
@@ -871,18 +847,8 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         
         {/* ==================== PAGE 1: COVER (SAMPUL LAPORAN) ==================== */}
         <div className="relative">
-          <div className="no-print flex items-center justify-between text-xs text-stone-300 mb-2 px-1">
-            <span className="font-mono text-stone-400">— Halaman 1: Sampul Laporan Resmi —</span>
-            <a
-              href="https://epersonal.pertanian.go.id/login/"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-950/85 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 hover:text-white text-[11px] font-semibold transition-all shadow-xs cursor-pointer"
-              title="Akses cepat portal e-Personal Kementerian Pertanian untuk upload laporan"
-            >
-              <span>Upload ke e-Personal</span>
-              <ExternalLink className="w-3 h-3 text-emerald-400" />
-            </a>
+          <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+            — Halaman 1: Sampul Laporan Resmi —
           </div>
           <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm]">
             <div className="space-y-3 mt-4">

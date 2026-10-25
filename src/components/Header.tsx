@@ -1,7 +1,6 @@
 import React from 'react';
-import { MinistryLogo } from './MinistryLogo';
 import { UserProfile } from '../types/logbook';
-import { FileText, PlusCircle, List, User } from 'lucide-react';
+import { FileText, PlusCircle, List, User, ExternalLink } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: 'form' | 'list' | 'report' | 'profile';
@@ -71,6 +70,19 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, profile
               <FileText className="w-4 h-4 text-emerald-400" />
               <span>Laporan Resmi</span>
             </button>
+
+            {/* Link e-Personal Kementan RI */}
+            <a
+              href="https://epersonal.pertanian.go.id/login/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-emerald-300 hover:text-white hover:bg-emerald-600/25 border border-emerald-500/35 transition-colors whitespace-nowrap shrink-0 group text-sm font-medium"
+              title="Buka Portal e-Personal Kementerian Pertanian RI (Tab Baru)"
+            >
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+              <span>e-Personal</span>
+              <ExternalLink className="w-3.5 h-3.5 opacity-75 group-hover:opacity-100 transition-opacity" />
+            </a>
 
             <button
               onClick={() => setActiveTab('profile')}
@@ -145,6 +157,16 @@ export const Header: React.FC<HeaderProps> = ({ activeTab, setActiveTab, profile
           <FileText className="w-4 h-4" />
           <span>Laporan</span>
         </button>
+        <a
+          href="https://epersonal.pertanian.go.id/login/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex flex-col items-center gap-0.5 text-xs py-1 px-2 rounded text-emerald-400 hover:text-white"
+          title="Buka Portal e-Personal Kementan RI"
+        >
+          <ExternalLink className="w-4 h-4" />
+          <span>e-Personal</span>
+        </a>
         <button
           onClick={() => setActiveTab('profile')}
           className={`flex flex-col items-center gap-0.5 text-xs py-1 px-2 rounded ${

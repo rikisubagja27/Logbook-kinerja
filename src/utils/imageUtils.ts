@@ -13,9 +13,11 @@ export async function resizeImageFile(
       return;
     }
 
-    // Safety check: ensure file is an image
-    if (!file.type.startsWith('image/') && !/\.(jpe?g|png|webp|bmp|gif|heic|heif)$/i.test(file.name)) {
-      reject(new Error('File yang dipilih bukan format gambar yang didukung (gunakan JPG, PNG, atau WebP)'));
+    // Check for obvious non-image files while allowing camera/gallery captures with generic mime types
+    const hasImageExt = /\.(jpe?g|png|webp|bmp|gif|heic|heif|tif|tiff)$/i.test(file.name || '');
+    const isExplicitlyNonImage = file.type && !file.type.startsWith('image/') && !hasImageExt && /\.(pdf|docx?|xlsx?|txt|zip)$/i.test(file.name || '');
+    if (isExplicitlyNonImage) {
+      reject(new Error('Format file bukan gambar. Harap pilih foto JPG, PNG, atau WebP.'));
       return;
     }
 
