@@ -871,23 +871,31 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
               </div>
 
               {/* 3. Luas Lahan (Third) */}
-              {/* Bagian Luas Lahan */}
-<div>
+             <div>
   <label className="block text-xs font-semibold text-stone-700">
     Luas Lahan
   </label>
   <div className="relative flex items-center">
     <input 
       type="text"
-      value={luasLahan} // Sesuaikan nama state Anda (misal: luasLahan)
+      value={luasLahan} 
       onChange={(e) => {
-        // Ambil hanya angka yang diketik
-        const value = e.target.value.replace(/[^0-9.]/g, '');
-        // Otomatis gabungkan dengan " m2"
-        setLuasLahan(value ? `${value} m2` : '');
+        const rawValue = e.target.value;
+        
+        // 1. Jika input dikosongkan oleh pengguna, kosongkan state
+        if (!rawValue || rawValue.trim() === '') {
+          setLuasLahan('');
+          return;
+        }
+
+        // 2. Ambil hanya angka dan titik dari input yang diketik
+        const numbersOnly = rawValue.replace(/[^0-9.]/g, '');
+        
+        // 3. Gabungkan kembali dengan satuan m2 secara otomatis
+        setLuasLahan(numbersOnly ? `${numbersOnly} m2` : '');
       }} 
       placeholder="Contoh: 500"
-      className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 pr-12"
+      className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 pr-12 bg-white"
       required
     />
     <span className="absolute right-3 text-stone-500 text-xs pointer-events-none">
