@@ -26,7 +26,8 @@ import {
   FileSpreadsheet,
   FileText,
   Image as ImageIcon,
-  CheckCircle2
+  CheckCircle2,
+  ChevronUp // <-- Impor ikon panah
 } from 'lucide-react';
 
 interface OfficialReportViewProps {
@@ -788,20 +789,31 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
             </div>
           )}
 
-          {/* Tanggal Cetak Penetapan */}
-          <div>
-            <label className="block text-xs font-semibold text-stone-300 mb-1">
-              Tanggal Penetapan Laporan
-            </label>
-            <input
-              type="date"
-              value={reportConfig.tanggalCetak}
-              onChange={(e) =>
-                setReportConfig((prev) => ({ ...prev, tanggalCetak: e.target.value }))
-              }
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
-            />
+                  {/* Tanggal Penetapan Laporan dengan Ikon Panah Hide */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <div className="flex items-center gap-1.5">
+              <label className="block text-xs font-semibold text-stone-300">
+                Tanggal Penetapan Laporan
+              </label>
+              <button
+                type="button"
+                onClick={() => setIsPanelHidden(true)}
+                className="p-0.5 text-emerald-400 hover:text-emerald-300 hover:bg-stone-800 rounded transition-colors cursor-pointer flex items-center justify-center"
+                title="Sembunyikan panel"
+              >
+                <ChevronUp className="w-4 h-4" />
+              </button>
+            </div>
           </div>
+          <input
+            type="date"
+            value={reportConfig.tanggalCetak}
+            onChange={(e) =>
+              setReportConfig((prev) => ({ ...prev, tanggalCetak: e.target.value }))
+            }
+            className="w-full px-3 py-2 text-xs rounded-xl border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
+          />
         </div>
 
         {/* Live Edit Mode Banner */}
