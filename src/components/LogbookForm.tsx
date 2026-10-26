@@ -871,37 +871,25 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
               </div>
 
               {/* 3. Luas Lahan (Third) */}
-             <div>
+            <div>
   <label className="block text-xs font-semibold text-stone-700">
     Luas Lahan
   </label>
   <div className="relative flex items-center">
     <input 
-      type="text"
-      value={luasLahan} 
-      onChange={(e) => {
-        const rawValue = e.target.value;
-        
-        // 1. Jika input dikosongkan oleh pengguna, kosongkan state
-        if (!rawValue || rawValue.trim() === '') {
-          setLuasLahan('');
-          return;
-        }
-
-        // 2. Ambil hanya angka dan titik dari input yang diketik
-        const numbersOnly = rawValue.replace(/[^0-9.]/g, '');
-        
-        // 3. Gabungkan kembali dengan satuan m2 secara otomatis
-        setLuasLahan(numbersOnly ? `${numbersOnly} m2` : '');
-      }} 
-      placeholder="Contoh: 500"
-      className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 pr-12 bg-white"
-      required
-    />
-    <span className="absolute right-3 text-stone-500 text-xs pointer-events-none">
+  type="number" 
+  value={luasLahan} 
+  onChange={(e) => setLuasLahan(e.target.value)} 
+  placeholder="Contoh: 500"
+  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 pr-12 bg-white"
+  required
+/>
+    {/* Satuan m2 muncul otomatis di sebelah kanan kotak input secara permanen */}
+    <span className="absolute right-3 text-stone-500 text-xs font-medium pointer-events-none bg-stone-100 px-1.5 py-0.5 rounded">
       m²
     </span>
   </div>
+  <p className="text-xs text-stone-500 mt-1">Cukup masukkan angka saja (satuan m² otomatis).</p>
 </div>
 
               {/* 4. Keterangan / Hasil Pelaksanaan (Fourth) */}
