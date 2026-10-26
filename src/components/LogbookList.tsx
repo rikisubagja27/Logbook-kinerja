@@ -340,7 +340,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
                     {entry.kehadiran === 'WFO' && entry.luasLahan && entry.luasLahan !== '-' && (
                       <span className="flex items-center gap-1 font-mono">
                         <Maximize2 className="w-3.5 h-3.5 text-stone-400 shrink-0" />
-                        <span>Luas: {entry.luasLahan}</span>
+                        <span>Luas: {entry.luasLahan} m²</span>
                       </span>
                     )}
                     {entry.keterangan && entry.keterangan !== '-' && (
