@@ -15,6 +15,7 @@ import {
 import { saveAs } from 'file-saver';
 import { LogbookEntry, UserProfile, ReportConfig } from '../types/logbook';
 import { base64ToUint8Array } from './imageUtils';
+import { formatAreaUnit } from './storage';
 
 const MONTH_NAMES = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -200,7 +201,7 @@ export async function exportReportToDocx(
         let desc = e.uraianPekerjaan;
         const locDetails: string[] = [];
         if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
-        if (e.luasLahan && e.luasLahan !== '-') locDetails.push(`Luas: ${e.luasLahan}`);
+        if (e.luasLahan && e.luasLahan !== '-') locDetails.push(`Luas: ${formatAreaUnit(e.luasLahan)}`);
         if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
         if (locDetails.length > 0) {
           desc += ` (${locDetails.join(', ')})`;

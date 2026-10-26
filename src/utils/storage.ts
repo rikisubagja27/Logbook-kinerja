@@ -337,6 +337,129 @@ export function saveLogbookEntries(entries: LogbookEntry[]): void {
   }
 }
 
+export const EPERSONAL_PORTAL_URL = 'https://epersonal.pertanian.go.id/';
+const EPERSONAL_AUTO_OPEN_KEY = 'kps1_manoko_epersonal_auto_open_v1';
+
+// Legacy mock NIPs to actively purge from previous sessions
+const LEGACY_MOCK_NIPS = new Set([
+  '198503152010121002',
+  '199004122015031004',
+  '199405182020122008',
+  '199211052023211015',
+]);
+
+const NIP_DIRECTORY_STORAGE_KEY = 'kps1_manoko_nip_directory_v2';
+
+// Pre-seeded official roster for KPS PVT I Manoko (ONLY real personnel: Riki Subagja)
+export const PRESEEDED_OFFICER_ROSTER: UserProfile[] = [
+  DEFAULT_USER_PROFILE,
+];
+
+export function cleanNipDigits(nip?: string): string {
+  if (!nip) return '';
+  return nip.replace(/\D/g, '');
+}
+
+export function loadNipDirectory(): UserProfile[] {
+  try {
+    // Also check and clean old key if exists
+    const oldRaw = localStorage.getItem('kps1_manoko_nip_directory_v1');
+    const currentRaw = localStorage.getItem(NIP_DIRECTORY_STORAGE_KEY) || oldRaw;
+
+    if (!currentRaw) {
+      saveNipDirectory(PRESEEDED_OFFICER_ROSTER);
+      return PRESEEDED_OFFICER_ROSTER;
+    }
+
+    const stored: UserProfile[] = JSON.parse(currentRaw);
+    if (!Array.isArray(stored)) {
+      saveNipDirectory(PRESEEDED_OFFICER_ROSTER);
+      return PRESEEDED_OFFICER_ROSTER;
+    }
+
+    // Filter out legacy mock officers
+    const filtered = stored.filter((item) => {
+      const clean = cleanNipDigits(item.nip);
+      return clean && !LEGACY_MOCK_NIPS.has(clean);
+    });
+
+    // Ensure Riki Subagja is present
+    const hasRiki = filtered.some((m) => cleanNipDigits(m.nip) === cleanNipDigits(DEFAULT_USER_PROFILE.nip));
+    if (!hasRiki) {
+      filtered.unshift(DEFAULT_USER_PROFILE);
+    }
+
+    // Save cleaned roster back
+    saveNipDirectory(filtered);
+    return filtered;
+  } catch (err) {
+    console.error('Error loading NIP directory:', err);
+    return PRESEEDED_OFFICER_ROSTER;
+  }
+}
+
+export function saveNipDirectory(directory: UserProfile[]): void {
+  try {
+    localStorage.setItem(NIP_DIRECTORY_STORAGE_KEY, JSON.stringify(directory));
+  } catch (err) {
+    console.error('Error saving NIP directory:', err);
+  }
+}
+
+export function findProfileByNip(nipInput: string): UserProfile | null {
+  const cleanInput = cleanNipDigits(nipInput);
+  if (!cleanInput) return null;
+
+  const directory = loadNipDirectory();
+  const match = directory.find((item) => cleanNipDigits(item.nip) === cleanInput);
+  return match || null;
+}
+
+export function saveProfileToNipDirectory(profile: UserProfile): void {
+  const cleanInput = cleanNipDigits(profile.nip);
+  if (!cleanInput) return;
+
+  const directory = loadNipDirectory();
+  const index = directory.findIndex((item) => cleanNipDigits(item.nip) === cleanInput);
+
+  let updated: UserProfile[];
+  if (index >= 0) {
+    updated = [...directory];
+    updated[index] = { ...updated[index], ...profile };
+  } else {
+    updated = [profile, ...directory];
+  }
+
+  saveNipDirectory(updated);
+}
+
+export function deleteProfileFromNipDirectory(nipInput: string): UserProfile[] {
+  const cleanInput = cleanNipDigits(nipInput);
+  if (!cleanInput) return loadNipDirectory();
+
+  const directory = loadNipDirectory();
+  // Don't delete Riki Subagja as he is default personnel
+  const updated = directory.filter((item) => cleanNipDigits(item.nip) !== cleanInput || cleanInput === cleanNipDigits(DEFAULT_USER_PROFILE.nip));
+  saveNipDirectory(updated);
+  return updated;
+}
+
+export function loadEpersonalAutoOpen(): boolean {
+  try {
+    return localStorage.getItem(EPERSONAL_AUTO_OPEN_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+export function saveEpersonalAutoOpen(enabled: boolean): void {
+  try {
+    localStorage.setItem(EPERSONAL_AUTO_OPEN_KEY, enabled ? 'true' : 'false');
+  } catch (err) {
+    console.error('Error saving E-Personal auto-open preference:', err);
+  }
+}
+
 export function loadUserProfile(): UserProfile {
   try {
     const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
@@ -354,6 +477,9 @@ export function loadUserProfile(): UserProfile {
 export function saveUserProfile(profile: UserProfile): void {
   try {
     localStorage.setItem(PROFILE_STORAGE_KEY, JSON.stringify(profile));
+    if (profile.nip && cleanNipDigits(profile.nip).length >= 8) {
+      saveProfileToNipDirectory(profile);
+    }
   } catch (err) {
     console.error('Error saving user profile:', err);
   }
@@ -385,4 +511,29 @@ export function clearGoogleAccount(): void {
     console.error('Error clearing Google account:', err);
   }
 }
+
+/**
+ * Formats a raw area input into standard meter persegi string (e.g. "800 m²").
+ * If already has unit or is empty/'-', normalizes appropriately.
+ */
+export function formatAreaUnit(raw?: string): string {
+  if (!raw) return '-';
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed === '-') return '-';
+
+  // Strip existing m², m2, m^2, meter persegi
+  const cleaned = trimmed.replace(/\s*(m²|m2|m\^2|meter\s*persegi)\s*/gi, '').trim();
+  if (!cleaned || cleaned === '-') return '-';
+
+  return `${cleaned} m²`;
+}
+
+/**
+ * Extracts only digits and decimal/thousand separators for input editing (e.g. "800 m²" -> "800").
+ */
+export function parseAreaDigitsOnly(raw?: string): string {
+  if (!raw || raw.trim() === '' || raw.trim() === '-') return '';
+  return raw.replace(/\s*(m²|m2|m\^2|meter\s*persegi)\s*/gi, '').trim();
+}
+
 
