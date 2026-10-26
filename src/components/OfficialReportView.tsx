@@ -703,30 +703,28 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   </button>
 </div>
 
-        {/* Category & Period Selectors (ORDER: Bulanan first, then Triwulan, then Tahunan) */}
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
-          {/* Kategori Laporan */}
-          <div>
-            <label className="block text-xs font-semibold text-stone-300 mb-1">
-              Kategori Laporan
-            </label>
-            <div className="flex p-0.5 bg-stone-900 rounded-lg border border-stone-700">
-              {(['bulanan', 'triwulan', 'tahunan'] as ReportType[]).map((tipe) => (
-                <button
-                  key={tipe}
-                  type="button"
-                  onClick={() => setReportConfig((prev) => ({ ...prev, tipe }))}
-                  className={`flex-1 py-1.5 text-xs font-medium rounded-md capitalize transition-all cursor-pointer ${
-                    reportConfig.tipe === tipe
-                      ? 'bg-emerald-700 text-white shadow-xs font-bold'
-                      : 'text-stone-400 hover:text-white'
-                  }`}
-                >
-                  {tipe}
-                </button>
-              ))}
-            </div>
-          </div>
+        {/* Kategori Laporan (Diperbesar) */}
+<div className="sm:col-span-1">
+  <label className="block text-xs font-semibold text-stone-300 mb-1.5">
+    Kategori Laporan
+  </label>
+  <div className="grid grid-cols-3 gap-1 bg-stone-900 p-1 rounded-xl border border-stone-700">
+    {(['bulanan', 'triwulan', 'tahunan'] as ReportType[]).map((tipe) => (
+      <button
+        key={tipe}
+        type="button"
+        onClick={() => setReportConfig((prev) => ({ ...prev, tipe }))}
+        className={`py-2.5 text-xs font-bold rounded-lg capitalize transition-all cursor-pointer text-center ${
+          reportConfig.tipe === tipe
+            ? 'bg-emerald-700 text-white shadow-md'
+            : 'text-stone-400 hover:text-white hover:bg-stone-800'
+        }`}
+      >
+        {tipe}
+      </button>
+    ))}
+  </div>
+</div>
 
           {/* Tahun */}
           <div>
