@@ -13,10 +13,11 @@ import { Header } from './components/Header';
 import { LogbookForm } from './components/LogbookForm';
 import { LogbookList } from './components/LogbookList';
 import { OfficialReportView } from './components/OfficialReportView';
+import { EPersonalView } from './components/EPersonalView';
 import { ProfileView } from './components/ProfileView';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'report' | 'profile'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'report' | 'epersonal' | 'profile'>('form');
   const [entries, setEntries] = useState<LogbookEntry[]>(() => loadLogbookEntries());
   const [profile, setProfile] = useState<UserProfile>(() => loadUserProfile());
   const [editingEntry, setEditingEntry] = useState<LogbookEntry | null>(null);
@@ -107,10 +108,19 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'epersonal' && (
+          <EPersonalView
+            currentProfile={profile}
+            onSelectProfile={handleSaveProfile}
+            onNavigateToProfile={() => setActiveTab('profile')}
+          />
+        )}
+
         {activeTab === 'profile' && (
           <ProfileView
             profile={profile}
             onSaveProfile={handleSaveProfile}
+            onNavigateToEpersonal={() => setActiveTab('epersonal')}
           />
         )}
       </main>

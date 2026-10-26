@@ -5,14 +5,8 @@ import {
   loadGoogleAccount, 
   saveGoogleAccount, 
   clearGoogleAccount,
-  findProfileByNip,
-  loadNipDirectory,
   saveProfileToNipDirectory,
-  deleteProfileFromNipDirectory,
   cleanNipDigits,
-  loadEpersonalAutoOpen,
-  saveEpersonalAutoOpen,
-  EPERSONAL_PORTAL_URL,
   DEFAULT_USER_PROFILE
 } from '../utils/storage';
 import { 
@@ -24,7 +18,6 @@ import {
   RotateCcw, 
   Save, 
   CheckCircle2, 
-  Trash2, 
   AlertCircle, 
   X,
   LogIn,
@@ -34,18 +27,15 @@ import {
   Mail,
   ShieldCheck,
   Check,
-  BadgeCheck,
-  KeyRound,
-  UserCheck,
-  ExternalLink,
-  PlusCircle,
-  Copy,
-  HelpCircle
+  Trash2,
+  ArrowRight,
+  ExternalLink
 } from 'lucide-react';
 
 interface ProfileViewProps {
   profile: UserProfile;
   onSaveProfile: (updated: UserProfile) => void;
+  onNavigateToEpersonal?: () => void;
 }
 
 const GoogleLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -69,38 +59,16 @@ const GoogleLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
   </svg>
 );
 
-export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile }) => {
+export const ProfileView: React.FC<ProfileViewProps> = ({ 
+  profile, 
+  onSaveProfile,
+  onNavigateToEpersonal
+}) => {
   const [formData, setFormData] = useState<UserProfile>(profile);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
   const [showSavedToast, setShowSavedToast] = useState(false);
   const [toastMessage, setToastMessage] = useState('Profil Pegawai Berhasil Diperbarui!');
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  // NIP Authentication & Auto-Fill State
-  const [activeAuthTab, setActiveAuthTab] = useState<'nip' | 'google'>('nip');
-  const [nipSearchInput, setNipSearchInput] = useState('');
-  const [officerDirectory, setOfficerDirectory] = useState<UserProfile[]>(() => loadNipDirectory());
-  const [nipSuccessInfo, setNipSuccessInfo] = useState<string | null>(null);
-  const [nipErrorInfo, setNipErrorInfo] = useState<string | null>(null);
-
-  // E-Personal Settings & Integration
-  const [autoOpenEpersonal, setAutoOpenEpersonal] = useState<boolean>(() => loadEpersonalAutoOpen());
-  const [copiedNipStatus, setCopiedNipStatus] = useState<string | null>(null);
-
-  // New Employee Registration Modal State
-  const [isRegisterEmployeeModalOpen, setIsRegisterEmployeeModalOpen] = useState(false);
-  const [newEmpFormData, setNewEmpFormData] = useState<Partial<UserProfile>>({
-    nama: '',
-    nip: '',
-    jabatan: 'Operator Layanan Operasional',
-    statusKepegawaian: 'PPPK Paruh Waktu',
-    unitKerja: 'Kebun Pemeriksaan Substantif PVT I Manoko',
-    instansiInduk: 'Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian',
-    kementerian: 'Kementerian Pertanian',
-    tempatPenetapan: 'Bandung Barat',
-    email: '',
-  });
-  const [newEmpError, setNewEmpError] = useState<string | null>(null);
 
   // Google Authentication State
   const [googleAccount, setGoogleAccount] = useState<GoogleAccount | null>(() => loadGoogleAccount());
@@ -221,161 +189,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
     setFormData((prev) => ({ ...prev, tandaTanganUrl: undefined }));
   };
 
-  const handleToggleAutoOpenEpersonal = (enabled: boolean) => {
-    setAutoOpenEpersonal(enabled);
-    saveEpersonalAutoOpen(enabled);
-    setToastMessage(enabled ? 'Otomatis buka E-Personal diaktifkan saat login NIP!' : 'Otomatis buka E-Personal dinonaktifkan.');
-    setShowSavedToast(true);
-    setTimeout(() => setShowSavedToast(false), 2500);
-  };
-
-  const handleOpenEpersonal = (nipToCopy?: string) => {
-    const nip = nipToCopy || formData.nip;
-    if (nip) {
-      const clean = cleanNipDigits(nip);
-      try {
-        navigator.clipboard.writeText(clean);
-        setCopiedNipStatus(clean);
-        setTimeout(() => setCopiedNipStatus(null), 3500);
-      } catch {
-        // clipboard write fallback
-      }
-    }
-    window.open(EPERSONAL_PORTAL_URL, '_blank', 'noopener,noreferrer');
-  };
-
-  const handleNipLogin = (targetNip: string) => {
-    const cleaned = cleanNipDigits(targetNip);
-    if (!cleaned) {
-      setNipErrorInfo('Silakan masukkan nomor NIP (angka) pegawai.');
-      setNipSuccessInfo(null);
-      return;
-    }
-
-    const matched = findProfileByNip(cleaned);
-    if (matched) {
-      setFormData(matched);
-      onSaveProfile(matched);
-      setNipErrorInfo(null);
-
-      // Auto-copy NIP to clipboard for instant pasting on E-Personal
-      try {
-        navigator.clipboard.writeText(matched.nip);
-        setCopiedNipStatus(matched.nip);
-        setTimeout(() => setCopiedNipStatus(null), 4000);
-      } catch {
-        // clipboard fallback
-      }
-
-      // Check if user has enabled auto-open E-Personal portal
-      if (autoOpenEpersonal) {
-        window.open(EPERSONAL_PORTAL_URL, '_blank', 'noopener,noreferrer');
-      }
-
-      setNipSuccessInfo(`Login Berhasil! Data profil "${matched.nama}" (${matched.nip}) otomatis dimuat. NIP telah otomatis disalin ke clipboard untuk kemudahan akses E-Personal.`);
-      setToastMessage(`Login Berhasil! Profil ${matched.nama} otomatis terisi & NIP disalin.`);
-      setShowSavedToast(true);
-      setTimeout(() => setShowSavedToast(false), 4000);
-    } else {
-      setNipSuccessInfo(null);
-      setNipErrorInfo(`NIP "${targetNip}" belum terdaftar di daftar karyawan KPS 1 Manoko. Klik tombol "+ Daftarkan Karyawan Baru" di bawah untuk mendaftarkan rekan Anda.`);
-      setFormData((prev) => ({ ...prev, nip: targetNip }));
-    }
-  };
-
-  const handleRegisterNewEmployee = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newEmpFormData.nama?.trim()) {
-      setNewEmpError('Silakan masukkan nama lengkap pegawai.');
-      return;
-    }
-    const cleanNip = cleanNipDigits(newEmpFormData.nip);
-    if (!cleanNip || cleanNip.length < 4) {
-      setNewEmpError('Silakan masukkan nomor NIP pegawai yang valid (minimal 4 angka).');
-      return;
-    }
-
-    // Default clean initials avatar
-    const initialsPhoto = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(newEmpFormData.nama.trim())}&backgroundColor=047857,0f766e,15803d&textColor=ffffff`;
-
-    const newProfile: UserProfile = {
-      nama: newEmpFormData.nama.trim().toUpperCase(),
-      nip: cleanNip,
-      jabatan: newEmpFormData.jabatan?.trim() || 'Operator Layanan Operasional',
-      statusKepegawaian: newEmpFormData.statusKepegawaian?.trim() || 'PPPK Paruh Waktu',
-      unitKerja: newEmpFormData.unitKerja?.trim() || 'Kebun Pemeriksaan Substantif PVT I Manoko',
-      instansiInduk: newEmpFormData.instansiInduk?.trim() || 'Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian',
-      kementerian: newEmpFormData.kementerian?.trim() || 'Kementerian Pertanian',
-      tempatPenetapan: newEmpFormData.tempatPenetapan?.trim() || 'Bandung Barat',
-      email: newEmpFormData.email?.trim() || '',
-      fotoProfil: initialsPhoto,
-      tandaTanganUrl: undefined,
-    };
-
-    saveProfileToNipDirectory(newProfile);
-    const updatedRoster = loadNipDirectory();
-    setOfficerDirectory(updatedRoster);
-
-    // Automatically load newly registered employee into active session
-    setFormData(newProfile);
-    onSaveProfile(newProfile);
-
-    // Auto-copy NIP
-    try {
-      navigator.clipboard.writeText(newProfile.nip);
-      setCopiedNipStatus(newProfile.nip);
-      setTimeout(() => setCopiedNipStatus(null), 4000);
-    } catch {
-      // clipboard fallback
-    }
-
-    if (autoOpenEpersonal) {
-      window.open(EPERSONAL_PORTAL_URL, '_blank', 'noopener,noreferrer');
-    }
-
-    setIsRegisterEmployeeModalOpen(false);
-    setNewEmpError(null);
-    setNewEmpFormData({
-      nama: '',
-      nip: '',
-      jabatan: 'Operator Layanan Operasional',
-      statusKepegawaian: 'PPPK Paruh Waktu',
-      unitKerja: 'Kebun Pemeriksaan Substantif PVT I Manoko',
-      instansiInduk: 'Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian',
-      kementerian: 'Kementerian Pertanian',
-      tempatPenetapan: 'Bandung Barat',
-      email: '',
-    });
-
-    setToastMessage(`Karyawan "${newProfile.nama}" berhasil didaftarkan & data otomatis dimuat!`);
-    setShowSavedToast(true);
-    setTimeout(() => setShowSavedToast(false), 4000);
-  };
-
-  const handleDeleteOfficer = (e: React.MouseEvent, officerNip: string, officerName: string) => {
-    e.stopPropagation();
-    const cleanCurrent = cleanNipDigits(DEFAULT_USER_PROFILE.nip);
-    const cleanTarget = cleanNipDigits(officerNip);
-    if (cleanTarget === cleanCurrent) {
-      alert('Pegawai utama (Riki Subagja) tidak dapat dihapus.');
-      return;
-    }
-
-    if (window.confirm(`Hapus pegawai "${officerName}" dari direktori NIP KPS 1 Manoko?`)) {
-      const updated = deleteProfileFromNipDirectory(officerNip);
-      setOfficerDirectory(updated);
-      setToastMessage(`Pegawai "${officerName}" dihapus dari direktori.`);
-      setShowSavedToast(true);
-      setTimeout(() => setShowSavedToast(false), 3000);
-    }
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     onSaveProfile(formData);
     if (formData.nip && cleanNipDigits(formData.nip).length >= 4) {
       saveProfileToNipDirectory(formData);
-      setOfficerDirectory(loadNipDirectory());
     }
     setToastMessage('Profil Pegawai & NIP Berhasil Disimpan!');
     setShowSavedToast(true);
@@ -400,8 +218,6 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
 
     setFormData(emptyProfile);
     onSaveProfile(emptyProfile);
-    setNipSuccessInfo(null);
-    setNipErrorInfo(null);
 
     // Clear signature canvas
     const canvas = canvasRef.current;
@@ -560,423 +376,158 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
         </div>
       </div>
 
-      {/* ========================================================================= */}
-      {/* AUTHENTICATION & LOGIN HUB (NIP DIRECTORY AUTO-FILL & GOOGLE SIGN-IN) */}
-      {/* ========================================================================= */}
-      <div className="bg-gradient-to-br from-stone-900 via-stone-950 to-emerald-950/90 border border-emerald-500/30 rounded-2xl shadow-xl text-white overflow-hidden">
-        {/* Method Switcher Tabs */}
-        <div className="flex border-b border-stone-800 bg-stone-950/70 p-1.5 gap-1.5">
-          <button
-            type="button"
-            onClick={() => setActiveAuthTab('nip')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              activeAuthTab === 'nip'
-                ? 'bg-emerald-700 text-white shadow-md border border-emerald-500/50'
-                : 'text-stone-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <BadgeCheck className="w-4 h-4 text-emerald-300" />
-            <span>Masuk dengan No. NIP (Otomatis Isi Profil)</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveAuthTab('google')}
-            className={`flex-1 flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-xs sm:text-sm font-bold transition-all cursor-pointer ${
-              activeAuthTab === 'google'
-                ? 'bg-stone-800 text-white shadow-md border border-stone-700'
-                : 'text-stone-400 hover:text-white hover:bg-white/5'
-            }`}
-          >
-            <GoogleLogo className="w-4 h-4" />
-            <span>Masuk dengan Akun Google</span>
-            {googleAccount && (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-            )}
-          </button>
+      {/* Information Banner: Data NIP & Direktori Dipindahkan ke Menu E-Personal */}
+      <div className="bg-gradient-to-r from-emerald-950/90 via-stone-900 to-emerald-950/90 border border-emerald-500/30 p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 text-white">
+        <div className="flex items-center gap-3.5">
+          <div className="w-11 h-11 rounded-xl bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0">
+            <Building2 className="w-5 h-5 text-emerald-400" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-emerald-300 uppercase tracking-wide">
+                Menu e-Personal &amp; Data NIP Pegawai
+              </span>
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
+                Telah Dipindahkan
+              </span>
+            </div>
+            <p className="text-xs text-stone-300 mt-0.5 leading-relaxed">
+              Pengelolaan seluruh data NIP karyawan KPS PVT 1 Manoko, login dengan nomor NIP, dan integrasi portal SIMPEG Kementerian Pertanian kini berada di menu <strong>e-Personal</strong>.
+            </p>
+          </div>
         </div>
 
-        <div className="p-5 sm:p-6">
-          {activeAuthTab === 'nip' ? (
-            /* =================================================================== */
-            /* TAB 1: NIP LOGIN & AUTOMATIC PROFILE PRE-FILL */
-            /* =================================================================== */
-            <div className="space-y-5 animate-fade-in">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-stone-800 pb-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <BadgeCheck className="w-5 h-5 text-emerald-400" />
-                    <h2 className="text-base font-bold text-white tracking-tight">
-                      Login Cepat dengan Nomor Induk Pegawai (NIP)
-                    </h2>
-                    <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full">
-                      Otomatis Isi Profil
-                    </span>
-                  </div>
-                  <p className="text-xs text-stone-300 leading-relaxed max-w-2xl">
-                    Ketik nomor NIP Anda atau klik kartu nama di bawah. Saat berhasil masuk, seluruh data profil pegawai (Nama, Jabatan, Status Kepegawaian, Unit Kerja, Kementerian, Email, Foto, hingga Tanda Tangan) akan <strong>otomatis terisi</strong>.
-                  </p>
-                </div>
+        {onNavigateToEpersonal && (
+          <button
+            type="button"
+            onClick={onNavigateToEpersonal}
+            className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white font-bold text-xs shadow-md transition-all cursor-pointer shrink-0 self-start sm:self-auto border border-emerald-500/40 active:scale-95"
+          >
+            <span>Buka Menu e-Personal</span>
+            <ArrowRight className="w-4 h-4" />
+          </button>
+        )}
+      </div>
 
-                {formData.nip && cleanNipDigits(formData.nip).length >= 8 && (
-                  <div className="shrink-0 bg-emerald-950/80 border border-emerald-500/40 px-3.5 py-2 rounded-xl text-xs text-emerald-200 flex items-center gap-2.5 shadow-xs">
-                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-                    <div>
-                      <p className="font-bold text-white text-[11px]">NIP Aktif Saat Ini:</p>
-                      <p className="font-mono text-emerald-300 text-xs">{formData.nip} &bull; {formData.nama}</p>
-                    </div>
-                  </div>
-                )}
+      {/* ========================================================================= */}
+      {/* GOOGLE SIGN-IN PANEL (UNTUK PENGGUNA BARU) */}
+      {/* ========================================================================= */}
+      <div className="bg-gradient-to-br from-stone-900 via-stone-950 to-emerald-950/90 border border-emerald-500/30 rounded-2xl shadow-xl text-white p-5 sm:p-6 overflow-hidden">
+        {googleAccount ? (
+          /* Logged In Google Account State */
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/20 pb-4">
+              <div className="flex items-center gap-2">
+                <GoogleLogo className="w-5 h-5 shrink-0" />
+                <span className="text-sm font-bold text-white tracking-tight">
+                  Akun Google Terhubung (Pengguna Aktif)
+                </span>
               </div>
-
-              {/* Input Box & Submit Button */}
-              <div className="bg-stone-900/90 border border-stone-700/80 p-4 rounded-xl space-y-3">
-                <label className="block text-xs font-bold text-stone-200">
-                  Ketik Nomor Induk Pegawai (NIP):
-                </label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-                  <div className="relative flex-1">
-                    <KeyRound className="w-4 h-4 text-stone-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-                    <input
-                      type="text"
-                      value={nipSearchInput}
-                      onChange={(e) => {
-                        setNipSearchInput(e.target.value);
-                        setNipErrorInfo(null);
-                      }}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          handleNipLogin(nipSearchInput);
-                        }
-                      }}
-                      placeholder="Contoh: 199808272025211042"
-                      className="w-full pl-10 pr-4 py-2.5 text-xs sm:text-sm rounded-xl border border-stone-700 bg-stone-950 text-white font-mono placeholder:text-stone-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                    />
-                  </div>
-
-                  <button
-                    type="button"
-                    onClick={() => handleNipLogin(nipSearchInput)}
-                    className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs sm:text-sm font-bold shadow-md transition-all cursor-pointer border border-emerald-500/40 active:scale-95 shrink-0"
-                  >
-                    <Sparkles className="w-4 h-4 text-amber-300" />
-                    <span>Masuk &amp; Isi Profil Otomatis</span>
-                  </button>
-                </div>
-
-                {/* Feedback message banners */}
-                {nipSuccessInfo && (
-                  <div className="p-3.5 rounded-xl bg-emerald-950/95 border border-emerald-500/60 text-emerald-200 text-xs space-y-2 animate-fade-in shadow-md">
-                    <div className="flex items-start gap-2.5">
-                      <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                      <div className="flex-1">
-                        <p className="leading-relaxed font-semibold text-white">{nipSuccessInfo}</p>
-                        {copiedNipStatus && (
-                          <div className="mt-1.5 flex items-center gap-1.5 text-[11px] text-amber-300 bg-black/40 px-2.5 py-1 rounded-md font-mono w-fit border border-amber-500/30">
-                            <Copy className="w-3 h-3" />
-                            <span>NIP {copiedNipStatus} disalin ke clipboard</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-end gap-2 pt-1 border-t border-emerald-800/40">
-                      <button
-                        type="button"
-                        onClick={() => handleOpenEpersonal(formData.nip)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold transition-all border border-emerald-400/40 shadow-xs cursor-pointer"
-                      >
-                        <ExternalLink className="w-3.5 h-3.5" />
-                        <span>Buka Portal E-Personal Kementan Sekarang ↗</span>
-                      </button>
-                    </div>
-                  </div>
-                )}
-
-                {nipErrorInfo && (
-                  <div className="p-3 rounded-lg bg-amber-950/80 border border-amber-500/50 text-amber-200 text-xs flex items-start gap-2.5 animate-fade-in">
-                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                    <p className="leading-relaxed">{nipErrorInfo}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* ================================================================= */}
-              {/* E-PERSONAL KEMENTAN QUICK ACCESS & AUTO-LAUNCH CONTROL */}
-              {/* ================================================================= */}
-              <div className="bg-gradient-to-r from-stone-900 via-emerald-950/60 to-stone-900 border border-emerald-600/30 rounded-xl p-4 space-y-3 shadow-md">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <ExternalLink className="w-4 h-4 text-emerald-400" />
-                      <h3 className="text-xs sm:text-sm font-bold text-white tracking-tight">
-                        Integrasi Portal E-Personal Kementan
-                      </h3>
-                      <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
-                        epersonal.pertanian.go.id
-                      </span>
-                    </div>
-                    <p className="text-[11px] text-stone-300 leading-relaxed">
-                      Akses cepat ke portal SIMPEG E-Personal Kementerian Pertanian dengan nomor NIP Anda.
-                    </p>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleOpenEpersonal(formData.nip)}
-                      className="flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-700 text-white text-xs font-bold transition-all border border-emerald-500/50 shadow-md cursor-pointer active:scale-95 shrink-0"
-                      title="Buka epersonal.pertanian.go.id di tab baru & otomatis salin NIP ke clipboard"
-                    >
-                      <ExternalLink className="w-3.5 h-3.5 text-amber-300" />
-                      <span>Buka E-Personal Kementan</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Auto-Open Option Switcher */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2.5 border-t border-emerald-900/50 text-xs">
-                  <label className="flex items-center gap-2.5 text-stone-200 cursor-pointer select-none">
-                    <input
-                      type="checkbox"
-                      checked={autoOpenEpersonal}
-                      onChange={(e) => handleToggleAutoOpenEpersonal(e.target.checked)}
-                      className="w-4 h-4 rounded text-emerald-600 bg-stone-950 border-stone-700 focus:ring-emerald-500 cursor-pointer"
-                    />
-                    <span className="font-medium text-xs text-stone-200">
-                      Otomatis buka tab E-Personal Kementan setiap kali login NIP berhasil
-                    </span>
-                  </label>
-
-                  <span className="text-[11px] text-emerald-400/90 font-mono flex items-center gap-1">
-                    <Copy className="w-3 h-3" />
-                    <span>NIP otomatis tersalin ke clipboard</span>
-                  </span>
-                </div>
-
-                {/* Clarification Note for Cross-Origin E-Personal portal login */}
-                <div className="bg-black/30 border border-stone-800 p-2.5 rounded-lg text-[11px] text-stone-400 space-y-1">
-                  <p className="flex items-center gap-1.5 font-semibold text-stone-300">
-                    <HelpCircle className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    <span>Informasi Teknis Login Portal E-Personal:</span>
-                  </p>
-                  <p className="leading-relaxed text-stone-400">
-                    Portal E-Personal Kementan dilindungi keamanan ketat peramban pemerintah (CORS &amp; perlindungan session cookies). Demi keamanan data ASN, peramban web tidak mengizinkan aplikasi eksternal menginjeksi password langsung ke halaman kementerian tanpa SSO server resmi. Sebagai gantinya, sistem ini <strong>otomatis menyalin nomor NIP Anda ke clipboard</strong> dan langsung membuka portal, sehingga Anda tinggal melakukan <em>Paste / Tempel</em> (Ctrl+V) pada kolom username E-Personal.
-                  </p>
-                </div>
-              </div>
-
-              {/* Quick Officer Directory / 1-Tap Pickers */}
-              <div className="space-y-3">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold text-stone-200 uppercase tracking-wider">
-                      Daftar Karyawan KPS PVT 1 Manoko:
-                    </span>
-                    <span className="text-[11px] text-stone-400 font-mono bg-stone-900 px-2 py-0.5 rounded border border-stone-800">
-                      {officerDirectory.length} Karyawan
-                    </span>
-                  </div>
-
-                  {/* Register New Officer Button */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setNewEmpError(null);
-                      setIsRegisterEmployeeModalOpen(true);
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-800/90 hover:bg-emerald-700 text-white text-xs font-bold transition-all border border-emerald-500/50 shadow-sm cursor-pointer self-start sm:self-auto"
-                    title="Daftarkan rekan kerja karyawan KPS 1 Manoko ke dalam sistem"
-                  >
-                    <PlusCircle className="w-3.5 h-3.5 text-amber-300" />
-                    <span>+ Daftarkan Karyawan Baru</span>
-                  </button>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-                  {officerDirectory.map((officer) => {
-                    const isCurrent = cleanNipDigits(formData.nip) === cleanNipDigits(officer.nip);
-                    const isDefault = cleanNipDigits(officer.nip) === cleanNipDigits(DEFAULT_USER_PROFILE.nip);
-
-                    return (
-                      <div
-                        key={officer.nip}
-                        onClick={() => {
-                          setNipSearchInput(officer.nip);
-                          handleNipLogin(officer.nip);
-                        }}
-                        className={`group relative flex items-center gap-3 p-3 rounded-xl border text-left transition-all cursor-pointer ${
-                          isCurrent
-                            ? 'bg-emerald-900/60 border-emerald-400 ring-1 ring-emerald-400 shadow-md'
-                            : 'bg-stone-900/70 border-stone-800 hover:border-emerald-500/60 hover:bg-stone-800/80'
-                        }`}
-                        title={`Klik untuk otomatis masuk sebagai ${officer.nama} (${officer.nip})`}
-                      >
-                        <div className="w-10 h-10 rounded-full overflow-hidden bg-stone-800 border border-emerald-500/40 shrink-0 flex items-center justify-center">
-                          {officer.fotoProfil ? (
-                            <img src={officer.fotoProfil} alt={officer.nama} className="w-full h-full object-cover" />
-                          ) : (
-                            <User className="w-5 h-5 text-stone-300" />
-                          )}
-                        </div>
-
-                        <div className="min-w-0 flex-1 pr-6">
-                          <div className="flex items-center gap-1.5">
-                            <p className="text-xs font-bold text-white truncate">{officer.nama}</p>
-                            {isCurrent && (
-                              <span className="text-[9px] bg-emerald-500 text-stone-950 font-black px-1.5 py-0.2 rounded-full uppercase">Aktif</span>
-                            )}
-                          </div>
-                          <p className="text-[11px] font-mono text-emerald-300 truncate">{officer.nip}</p>
-                          <p className="text-[10px] text-stone-400 truncate">{officer.statusKepegawaian || officer.jabatan}</p>
-                        </div>
-
-                        {/* Action buttons on card hover */}
-                        <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                          {!isDefault && (
-                            <button
-                              type="button"
-                              onClick={(e) => handleDeleteOfficer(e, officer.nip, officer.nama)}
-                              className="p-1.5 rounded-lg text-stone-500 hover:text-rose-400 hover:bg-rose-950/60 opacity-60 hover:opacity-100 transition-all cursor-pointer"
-                              title={`Hapus ${officer.nama} dari direktori`}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-
-                <p className="text-[11px] text-stone-400 italic">
-                  * Nama-nama yang tercantum di atas khusus pegawai yang terdaftar di KPS PVT 1 Manoko. Anda dapat menambah atau mengelola daftar pegawai sesuai kebutuhan operasional kebun.
-                </p>
+              <div className="flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-900/50 px-3 py-1 rounded-full border border-emerald-500/40 w-fit">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Terautentikasi Resmi</span>
               </div>
             </div>
-          ) : (
-            /* =================================================================== */
-            /* TAB 2: GOOGLE SIGN-IN PANEL */
-            /* =================================================================== */
-            <div className="animate-fade-in">
-              {googleAccount ? (
-                /* Logged In Google Account State */
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-emerald-500/20 pb-4">
-                    <div className="flex items-center gap-2">
-                      <GoogleLogo className="w-5 h-5 shrink-0" />
-                      <span className="text-sm font-bold text-white tracking-tight">
-                        Akun Google Terhubung (Pengguna Aktif)
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-900/50 px-3 py-1 rounded-full border border-emerald-500/40 w-fit">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
-                      <span>Terautentikasi Resmi</span>
-                    </div>
+
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              {/* Account details */}
+              <div className="flex items-center gap-3.5">
+                <div className="relative">
+                  <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-400 bg-stone-800 flex items-center justify-center shadow-md">
+                    {googleAccount.photoURL ? (
+                      <img
+                        src={googleAccount.photoURL}
+                        alt={googleAccount.displayName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-6 h-6 text-stone-300" />
+                    )}
                   </div>
-
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    {/* Account details */}
-                    <div className="flex items-center gap-3.5">
-                      <div className="relative">
-                        <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-emerald-400 bg-stone-800 flex items-center justify-center shadow-md">
-                          {googleAccount.photoURL ? (
-                            <img
-                              src={googleAccount.photoURL}
-                              alt={googleAccount.displayName}
-                              className="w-full h-full object-cover"
-                            />
-                          ) : (
-                            <User className="w-6 h-6 text-stone-300" />
-                          )}
-                        </div>
-                        <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-stone-950 rounded-full"></span>
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="font-bold text-white text-base">
-                            {googleAccount.displayName}
-                          </p>
-                          <span className="text-[10px] bg-white/10 text-stone-300 px-2 py-0.5 rounded font-mono">
-                            Google User
-                          </span>
-                        </div>
-                        <p className="text-xs text-emerald-300/90 font-mono mt-0.5 flex items-center gap-1.5">
-                          <Mail className="w-3 h-3 text-emerald-400" />
-                          <span>{googleAccount.email}</span>
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Action Buttons for Logged In User */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={handleApplyGoogleToForm}
-                        className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl shadow-md transition-all cursor-pointer border border-emerald-500/40"
-                        title="Salin Nama Lengkap dan Email Google ke Formulir Profil di bawah"
-                      >
-                        <Sparkles className="w-3.5 h-3.5 text-amber-300" />
-                        <span>Sinkron ke Form</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCreateNewOfficerProfile}
-                        className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all cursor-pointer border border-white/20"
-                        title="Buat profil pegawai baru dengan nama dan email akun Google ini"
-                      >
-                        <UserPlus className="w-3.5 h-3.5 text-emerald-300" />
-                        <span>Buat Profil Baru</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleGoogleLogout}
-                        className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-950/60 rounded-xl transition-all cursor-pointer border border-rose-500/30"
-                        title="Keluar dari akun Google ini"
-                      >
-                        <LogOut className="w-3.5 h-3.5 text-rose-400" />
-                        <span>Keluar</span>
-                      </button>
-                    </div>
-                  </div>
+                  <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-500 border-2 border-stone-950 rounded-full"></span>
                 </div>
-              ) : (
-                /* Not Logged In State (Prompts New Users to Sign In with Google) */
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
-                  <div className="space-y-1.5 max-w-xl">
-                    <div className="flex items-center gap-2">
-                      <div className="p-1.5 rounded-lg bg-white/10 border border-white/15">
-                        <GoogleLogo className="w-5 h-5" />
-                      </div>
-                      <h2 className="text-base font-bold text-white tracking-tight">
-                        Login Pengguna Baru dengan Akun Google
-                      </h2>
-                      <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full">
-                        Pengguna Baru
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-300 leading-relaxed">
-                      Bagi pegawai baru atau pengguna yang baru bertugas di KPS PVT 1 Manoko, Anda dapat langsung masuk dengan Akun Google untuk sinkronisasi identitas otomatis dan mengisi profil dinas Anda dengan mudah.
+                <div>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-white text-base">
+                      {googleAccount.displayName}
                     </p>
+                    <span className="text-[10px] bg-white/10 text-stone-300 px-2 py-0.5 rounded font-mono">
+                      Google User
+                    </span>
                   </div>
-
-                  <div className="shrink-0">
-                    <button
-                      type="button"
-                      onClick={() => setIsLoginModalOpen(true)}
-                      className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white hover:bg-stone-100 text-stone-900 font-bold text-xs sm:text-sm shadow-xl hover:shadow-2xl transition-all border border-stone-200 cursor-pointer active:scale-95"
-                    >
-                      <GoogleLogo className="w-4 h-4" />
-                      <span>Masuk dengan Akun Google</span>
-                    </button>
-                  </div>
+                  <p className="text-xs text-emerald-300/90 font-mono mt-0.5 flex items-center gap-1.5">
+                    <Mail className="w-3 h-3 text-emerald-400" />
+                    <span>{googleAccount.email}</span>
+                  </p>
                 </div>
-              )}
+              </div>
+
+              {/* Action Buttons for Logged In User */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleApplyGoogleToForm}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-700 hover:bg-emerald-600 text-white rounded-xl shadow-md transition-all cursor-pointer border border-emerald-500/40"
+                  title="Salin Nama Lengkap dan Email Google ke Formulir Profil di bawah"
+                >
+                  <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                  <span>Sinkron ke Form</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleCreateNewOfficerProfile}
+                  className="flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-white/10 hover:bg-white/20 text-white rounded-xl transition-all cursor-pointer border border-white/20"
+                  title="Buat profil pegawai baru dengan nama dan email akun Google ini"
+                >
+                  <UserPlus className="w-3.5 h-3.5 text-emerald-300" />
+                  <span>Buat Profil Baru</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleGoogleLogout}
+                  className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-300 hover:text-white hover:bg-rose-950/60 rounded-xl transition-all cursor-pointer border border-rose-500/30"
+                  title="Keluar dari akun Google ini"
+                >
+                  <LogOut className="w-3.5 h-3.5 text-rose-400" />
+                  <span>Keluar</span>
+                </button>
+              </div>
             </div>
-          )}
-        </div>
+          </div>
+        ) : (
+          /* Not Logged In State (Prompts New Users to Sign In with Google) */
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5">
+            <div className="space-y-1.5 max-w-xl">
+              <div className="flex items-center gap-2">
+                <div className="p-1.5 rounded-lg bg-white/10 border border-white/15">
+                  <GoogleLogo className="w-5 h-5" />
+                </div>
+                <h2 className="text-base font-bold text-white tracking-tight">
+                  Login Pengguna Baru dengan Akun Google
+                </h2>
+                <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full">
+                  Pengguna Baru
+                </span>
+              </div>
+              <p className="text-xs text-stone-300 leading-relaxed">
+                Bagi pegawai baru atau pengguna yang baru bertugas di KPS PVT 1 Manoko, Anda dapat langsung masuk dengan Akun Google untuk sinkronisasi identitas otomatis dan mengisi profil dinas Anda dengan mudah.
+              </p>
+            </div>
+
+            <div className="shrink-0">
+              <button
+                type="button"
+                onClick={() => setIsLoginModalOpen(true)}
+                className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white hover:bg-stone-100 text-stone-900 font-bold text-xs sm:text-sm shadow-xl hover:shadow-2xl transition-all border border-stone-200 cursor-pointer active:scale-95"
+              >
+                <GoogleLogo className="w-4 h-4" />
+                <span>Masuk dengan Akun Google</span>
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1103,167 +654,7 @@ export const ProfileView: React.FC<ProfileViewProps> = ({ profile, onSaveProfile
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* REGISTER NEW KPS 1 MANOKO EMPLOYEE MODAL */}
-      {/* ========================================================================= */}
-      {isRegisterEmployeeModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-sm animate-fade-in overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-lg w-full shadow-2xl border border-stone-200 overflow-hidden text-stone-900 my-8">
-            {/* Modal Top Green Accent Bar */}
-            <div className="h-1.5 w-full bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-700"></div>
 
-            <form onSubmit={handleRegisterNewEmployee} className="p-6 space-y-4">
-              <div className="flex items-start justify-between">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2">
-                    <UserCheck className="w-5 h-5 text-emerald-700" />
-                    <span className="text-xs font-black text-emerald-900 uppercase tracking-wider">KPS PVT 1 Manoko</span>
-                  </div>
-                  <h3 className="text-base font-bold text-stone-900">
-                    Daftarkan Karyawan Baru
-                  </h3>
-                  <p className="text-xs text-stone-500 leading-relaxed">
-                    Masukkan data karyawan resmi KPS PVT 1 Manoko agar saat login dengan nomor NIP, profil otomatis terisi.
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterEmployeeModalOpen(false)}
-                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {newEmpError && (
-                <div className="bg-red-50 text-red-700 border border-red-200 p-2.5 rounded-lg text-xs flex items-center gap-2">
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  <span>{newEmpError}</span>
-                </div>
-              )}
-
-              <div className="space-y-3 text-xs">
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">
-                    Nama Lengkap Pegawai <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: RIKI SUBAGJA"
-                    value={newEmpFormData.nama || ''}
-                    onChange={(e) => setNewEmpFormData({ ...newEmpFormData, nama: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 uppercase font-semibold"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block font-bold text-stone-700 mb-1">
-                      Nomor Induk Pegawai (NIP) <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      placeholder="18 digit angka NIP"
-                      value={newEmpFormData.nip || ''}
-                      onChange={(e) => setNewEmpFormData({ ...newEmpFormData, nip: e.target.value })}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block font-bold text-stone-700 mb-1">
-                      Status Kepegawaian
-                    </label>
-                    <select
-                      value={newEmpFormData.statusKepegawaian || 'PPPK Paruh Waktu'}
-                      onChange={(e) => setNewEmpFormData({ ...newEmpFormData, statusKepegawaian: e.target.value })}
-                      className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
-                    >
-                      <option value="PPPK Paruh Waktu">PPPK Paruh Waktu</option>
-                      <option value="PPPK Penuh Waktu">PPPK Penuh Waktu</option>
-                      <option value="Pegawai Negeri Sipil (PNS)">Pegawai Negeri Sipil (PNS)</option>
-                      <option value="Tenaga Teknis Lapangan">Tenaga Teknis Lapangan</option>
-                      <option value="Operator Kebun">Operator Kebun</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">
-                    Jabatan Kedinasan
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="Contoh: Operator Layanan Operasional"
-                    value={newEmpFormData.jabatan || ''}
-                    onChange={(e) => setNewEmpFormData({ ...newEmpFormData, jabatan: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-
-                <div>
-                  <label className="block font-bold text-stone-700 mb-1">
-                    Alamat Email (Kedinasan / Google)
-                  </label>
-                  <input
-                    type="email"
-                    placeholder="pegawai@gmail.com atau @pertanian.go.id"
-                    value={newEmpFormData.email || ''}
-                    onChange={(e) => setNewEmpFormData({ ...newEmpFormData, email: e.target.value })}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
-                  />
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                  <div>
-                    <label className="block text-[11px] font-semibold text-stone-500 mb-1">
-                      Unit Kerja
-                    </label>
-                    <input
-                      type="text"
-                      value={newEmpFormData.unitKerja || 'Kebun Pemeriksaan Substantif PVT I Manoko'}
-                      onChange={(e) => setNewEmpFormData({ ...newEmpFormData, unitKerja: e.target.value })}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-700"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-[11px] font-semibold text-stone-500 mb-1">
-                      Kota Penetapan
-                    </label>
-                    <input
-                      type="text"
-                      value={newEmpFormData.tempatPenetapan || 'Bandung Barat'}
-                      onChange={(e) => setNewEmpFormData({ ...newEmpFormData, tempatPenetapan: e.target.value })}
-                      className="w-full px-2.5 py-1.5 text-xs rounded-lg border border-stone-200 bg-stone-50 text-stone-700"
-                    />
-                  </div>
-                </div>
-              </div>
-
-              <div className="pt-3 flex items-center justify-end gap-2.5 border-t border-stone-200">
-                <button
-                  type="button"
-                  onClick={() => setIsRegisterEmployeeModalOpen(false)}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition-colors cursor-pointer"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-emerald-800 hover:bg-emerald-900 text-white font-bold text-xs shadow-md transition-all flex items-center gap-2 cursor-pointer active:scale-95"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Daftarkan &amp; Masuk Otomatis</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
 
       {/* ========================================================================= */}
       {/* MAIN PROFILE FORM */}

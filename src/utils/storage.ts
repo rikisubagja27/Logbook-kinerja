@@ -337,8 +337,16 @@ export function saveLogbookEntries(entries: LogbookEntry[]): void {
   }
 }
 
-export const EPERSONAL_PORTAL_URL = 'https://epersonal.pertanian.go.id/';
+export const EPERSONAL_PORTAL_URL = 'https://epersonal.pertanian.go.id/login';
 const EPERSONAL_AUTO_OPEN_KEY = 'kps1_manoko_epersonal_auto_open_v1';
+
+export function getEpersonalUrlWithNip(nip?: string): string {
+  const clean = cleanNipDigits(nip);
+  if (clean) {
+    return `https://epersonal.pertanian.go.id/login?nip=${encodeURIComponent(clean)}&username=${encodeURIComponent(clean)}`;
+  }
+  return 'https://epersonal.pertanian.go.id/login';
+}
 
 // Legacy mock NIPs to actively purge from previous sessions
 const LEGACY_MOCK_NIPS = new Set([
