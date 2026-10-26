@@ -501,9 +501,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
           <h1 className="text-2xl font-extrabold text-white tracking-tight drop-shadow-sm">
             {editingEntry ? 'Edit Catatan Logbook Kinerja' : 'Isi & Catat Logbook Kinerja Harian'}
           </h1>
-          <p className="text-sm text-stone-300 mt-1">
-            Pencatatan presisi operasional lapangan WFO, izin sakit bersurat, dan cuti kedinasan.
-          </p>
+          
         </div>
 
         {editingEntry && (
