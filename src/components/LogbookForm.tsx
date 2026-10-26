@@ -498,7 +498,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
             <Sparkles className="w-4 h-4 text-emerald-400" />
             <span>KPS PVT I MANOKO · LEMBANG</span>
           </div>
-          <h1 className="text-1,5xl font-extrabold text-white tracking-tight drop-shadow-sm">
+          <h1 className="text-1x2 font-extrabold text-white tracking-tight drop-shadow-sm">
             {editingEntry ? 'Edit Catatan Logbook Kinerja' : 'Isi & Catat Logbook Kinerja Harian'}
           </h1>
           
