@@ -905,10 +905,6 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                 </span>
               </div>
 
-              <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-900 flex items-start gap-2.5">
-                <AlertCircle className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-              </div>
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5 pt-2">
                 {/* Native accessible File Inputs */}
                 <input
