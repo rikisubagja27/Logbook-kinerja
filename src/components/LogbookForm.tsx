@@ -614,7 +614,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                   onClick={() => setStandardHours('08:00', '12:00')}
                   className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-md transition-colors cursor-pointer"
                 >
-                  08:00 - 12:00 (Setengah Hari)
+                  07:30 - 12:00 (Setengah Hari)
                 </button>
               </div>
             </div>
