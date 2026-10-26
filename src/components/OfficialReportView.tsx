@@ -659,53 +659,49 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           </div>
 
           {/* Action buttons */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              onClick={() => setIsEditMode(!isEditMode)}
-              className={`flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition-all border ${
-                isEditMode
-                  ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-md ring-2 ring-amber-300/50'
-                  : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
-              }`}
-              title="Edit teks laporan dan gambar tabel secara langsung"
-            >
-              <Edit3 className="w-4 h-4" />
-              <span>{isEditMode ? 'Selesai Edit' : 'Edit Langsung Laporan'}</span>
-            </button>
+<div className="flex flex-wrap items-center gap-1.5">
+  <button
+    onClick={() => setIsEditMode(!isEditMode)}
+    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+      isEditMode
+        ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-md ring-2 ring-amber-300/50'
+        : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+    }`}
+    title="Edit teks laporan dan gambar tabel secara langsung"
+  >
+    <Edit3 className="w-3.5 h-3.5" />
+    <span>{isEditMode ? 'Selesai Edit' : 'Edit Laporan'}</span>
+  </button>
 
-            <button
-              onClick={handleExportDocx}
-              disabled={isExportingDocx || isGeneratingPdf}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 cursor-pointer"
-            >
-              <FileDown className="w-4 h-4" />
-              <span>{isExportingDocx ? 'Membuat Word...' : 'Ekspor Word (.docx)'}</span>
-            </button>
+  <button
+    onClick={handleExportDocx}
+    disabled={isExportingDocx || isGeneratingPdf}
+    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 cursor-pointer"
+  >
+    <FileDown className="w-3.5 h-3.5" />
+    <span>{isExportingDocx ? 'Word...' : 'Word (.docx)'}</span>
+  </button>
 
-            {/* Direct PDF Download */}
-            <button
-              onClick={handleDownloadPdf}
-              disabled={isGeneratingPdf || isExportingDocx}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 border border-emerald-500/30 cursor-pointer"
-              title="Unduh file dokumen PDF secara langsung"
-            >
-              <FileText className="w-4 h-4" />
-              <span>{isGeneratingPdf ? pdfProgress || 'Menyimpan PDF...' : 'Simpan / Unduh PDF'}</span>
-            </button>
+  <button
+    onClick={handleDownloadPdf}
+    disabled={isGeneratingPdf || isExportingDocx}
+    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 border border-emerald-500/30 cursor-pointer"
+    title="Unduh file dokumen PDF secara langsung"
+  >
+    <FileText className="w-3.5 h-3.5" />
+    <span>{isGeneratingPdf ? pdfProgress || 'PDF...' : 'Unduh PDF'}</span>
+  </button>
 
-
-            {/* Print fallback */}
-            <button
-              onClick={() => window.print()}
-              disabled={isGeneratingPdf}
-              className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors border border-white/20 cursor-pointer"
-              title="Buka dialog cetak browser"
-            >
-              <Printer className="w-4 h-4 text-emerald-300" />
-              <span>Cetak</span>
-            </button>
-          </div>
-        </div>
+  <button
+    onClick={() => window.print()}
+    disabled={isGeneratingPdf}
+    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors border border-white/20 cursor-pointer"
+    title="Buka dialog cetak browser"
+  >
+    <Printer className="w-3.5 h-3.5 text-emerald-300" />
+    <span>Cetak</span>
+  </button>
+</div>
 
         {/* Category & Period Selectors (ORDER: Bulanan first, then Triwulan, then Tahunan) */}
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1">
