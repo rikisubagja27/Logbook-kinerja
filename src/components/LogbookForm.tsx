@@ -870,20 +870,31 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                 </div>
               </div>
 
-              {/* 3. Luas Lahan / Volume Kerja (Third) */}
-              <div>
-                <label className="block text-xs font-semibold text-stone-700 mb-1 flex items-center gap-1.5">
-                  <Maximize2 className="w-3.5 h-3.5 text-stone-500" />
-                  Luas Lahan / Volume Kerja
-                </label>
-                <input
-                  type="text"
-                  value={luasLahan}
-                  onChange={(e) => setLuasLahan(e.target.value)}
-                  placeholder="Contoh: 800 m², 1.200 m², 0.5 ha, atau '-'"
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-stone-50/50"
-                />
-              </div>
+              {/* 3. Luas Lahan (Third) */}
+              {/* Bagian Luas Lahan */}
+<div>
+  <label className="block text-xs font-semibold text-stone-700">
+    Luas Lahan
+  </label>
+  <div className="relative flex items-center">
+    <input 
+      type="text"
+      value={luasLahan} // Sesuaikan nama state Anda (misal: luasLahan)
+      onChange={(e) => {
+        // Ambil hanya angka yang diketik
+        const value = e.target.value.replace(/[^0-9.]/g, '');
+        // Otomatis gabungkan dengan " m2"
+        setLuasLahan(value ? `${value} m2` : '');
+      }} 
+      placeholder="Contoh: 500"
+      className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 pr-12"
+      required
+    />
+    <span className="absolute right-3 text-stone-500 text-xs pointer-events-none">
+      m²
+    </span>
+  </div>
+</div>
 
               {/* 4. Keterangan / Hasil Pelaksanaan (Fourth) */}
               <div>
