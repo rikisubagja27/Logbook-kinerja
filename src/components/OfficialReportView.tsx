@@ -27,7 +27,8 @@ import {
   FileText,
   Image as ImageIcon,
   CheckCircle2,
-  ChevronUp // <-- Impor ikon panah
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 
 interface OfficialReportViewProps {
@@ -107,6 +108,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
   const [pdfProgress, setPdfProgress] = useState<string>('');
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isPanelHidden, setIsPanelHidden] = useState(false);
 
   // Editable custom overrides state
   const [customTable1, setCustomTable1] = useState<Table1RowItem[]>([]);
@@ -232,7 +234,9 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           let desc = e.uraianPekerjaan;
           const locDetails: string[] = [];
           if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
-          if (e.luasLahan && e.luasLahan !== '-') locDetails.push(`Luas: ${e.luasLahan}`);
+          if (e.luasLahan && e.luasLahan !== '-') {
+            locDetails.push(`Luas: ${/m²|m2/i.test(e.luasLahan) ? e.luasLahan : `${e.luasLahan} m²`}`);
+          }
           if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
           if (locDetails.length > 0) {
             desc += ` (${locDetails.join(', ')})`;
@@ -266,7 +270,12 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           } else if (e.kehadiran === 'Cuti') {
             items.push(`Cuti: ${e.keterangan || 'Cuti Resmi'}`);
           } else {
-            const locInfo = e.lokasiPekerjaan && e.lokasiPekerjaan !== '-' ? ` (${e.lokasiPekerjaan})` : '';
+            const locDetails: string[] = [];
+            if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
+            if (e.luasLahan && e.luasLahan !== '-') {
+              locDetails.push(`Luas: ${/m²|m2/i.test(e.luasLahan) ? e.luasLahan : `${e.luasLahan} m²`}`);
+            }
+            const locInfo = locDetails.length > 0 ? ` (${locDetails.join(', ')})` : '';
             items.push(`${e.uraianPekerjaan}${locInfo}`);
           }
         });
@@ -660,161 +669,204 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           </div>
 
           {/* Action buttons */}
-<div className="flex flex-wrap items-center gap-1.5">
-  <button
-    onClick={() => setIsEditMode(!isEditMode)}
-    className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
-      isEditMode
-        ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-md ring-2 ring-amber-300/50'
-        : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
-    }`}
-    title="Edit teks laporan dan gambar tabel secara langsung"
-  >
-    <Edit3 className="w-3.5 h-3.5" />
-    <span>{isEditMode ? 'Selesai Edit' : 'Edit Laporan'}</span>
-  </button>
-
-  <button
-    onClick={handleExportDocx}
-    disabled={isExportingDocx || isGeneratingPdf}
-    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 cursor-pointer"
-  >
-    <FileDown className="w-3.5 h-3.5" />
-    <span>{isExportingDocx ? 'Word...' : 'Word (.docx)'}</span>
-  </button>
-
-  <button
-    onClick={handleDownloadPdf}
-    disabled={isGeneratingPdf || isExportingDocx}
-    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 border border-emerald-500/30 cursor-pointer"
-    title="Unduh file dokumen PDF secara langsung"
-  >
-    <FileText className="w-3.5 h-3.5" />
-    <span>{isGeneratingPdf ? pdfProgress || 'PDF...' : 'Unduh PDF'}</span>
-  </button>
-
-  <button
-    onClick={() => window.print()}
-    disabled={isGeneratingPdf}
-    className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors border border-white/20 cursor-pointer"
-    title="Buka dialog cetak browser"
-  >
-    <Printer className="w-3.5 h-3.5 text-emerald-300" />
-    <span>Cetak</span>
-  </button>
-</div>
-
-        {/* Kategori Laporan (Diperbesar) */}
-<div className="sm:col-span-1">
-  <label className="block text-xs font-semibold text-stone-300 mb-1.5">
-    Kategori Laporan
-  </label>
-  <div className="grid grid-cols-3 gap-1 bg-stone-900 p-1 rounded-xl border border-stone-700">
-    {(['bulanan', 'triwulan', 'tahunan'] as ReportType[]).map((tipe) => (
-      <button
-        key={tipe}
-        type="button"
-        onClick={() => setReportConfig((prev) => ({ ...prev, tipe }))}
-        className={`py-2.5 text-xs font-bold rounded-lg capitalize transition-all cursor-pointer text-center ${
-          reportConfig.tipe === tipe
-            ? 'bg-emerald-700 text-white shadow-md'
-            : 'text-stone-400 hover:text-white hover:bg-stone-800'
-        }`}
-      >
-        {tipe}
-      </button>
-    ))}
-  </div>
-</div>
-
-          {/* Tahun */}
-          <div>
-            <label className="block text-xs font-semibold text-stone-300 mb-1">
-              Tahun Anggaran
-            </label>
-            <select
-              value={reportConfig.tahun}
-              onChange={(e) =>
-                setReportConfig((prev) => ({ ...prev, tahun: parseInt(e.target.value) }))
-              }
-              className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
+          <div className="flex flex-wrap items-center gap-1.5">
+            <button
+              onClick={() => setIsEditMode(!isEditMode)}
+              className={`flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold transition-all border ${
+                isEditMode
+                  ? 'bg-amber-400 text-stone-950 border-amber-300 shadow-md ring-2 ring-amber-300/50'
+                  : 'bg-white/10 text-white border-white/20 hover:bg-white/20'
+              }`}
+              title="Edit teks laporan dan gambar tabel secara langsung"
             >
-              {[2024, 2025, 2026, 2027, 2028].map((y) => (
-                <option key={y} value={y}>
-                  Tahun {y}
-                </option>
-              ))}
-            </select>
-          </div>
+              <Edit3 className="w-3.5 h-3.5" />
+              <span>{isEditMode ? 'Selesai Edit' : 'Edit Laporan'}</span>
+            </button>
 
-          {/* Sub Period Selection */}
-          {reportConfig.tipe === 'bulanan' && (
+            <button
+              onClick={handleExportDocx}
+              disabled={isExportingDocx || isGeneratingPdf}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <FileDown className="w-3.5 h-3.5" />
+              <span>{isExportingDocx ? 'Word...' : 'Word (.docx)'}</span>
+            </button>
+
+            <button
+              onClick={handleDownloadPdf}
+              disabled={isGeneratingPdf || isExportingDocx}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 border border-emerald-500/30 cursor-pointer"
+              title="Unduh file dokumen PDF secara langsung"
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>{isGeneratingPdf ? pdfProgress || 'PDF...' : 'Unduh PDF'}</span>
+            </button>
+
+            <button
+              onClick={() => window.print()}
+              disabled={isGeneratingPdf}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs font-semibold transition-colors border border-white/20 cursor-pointer"
+              title="Buka dialog cetak browser"
+            >
+              <Printer className="w-3.5 h-3.5 text-emerald-300" />
+              <span>Cetak</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Category & Period Selectors with Hide Toggle to save vertical space */}
+        {!isPanelHidden ? (
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1 animate-fade-in">
+            {/* Kategori Laporan (Diperbesar) */}
+            <div className="sm:col-span-1">
+              <label className="block text-xs font-semibold text-stone-300 mb-1.5">
+                Kategori Laporan
+              </label>
+              <div className="grid grid-cols-3 gap-1 bg-stone-900 p-1 rounded-xl border border-stone-700">
+                {(['bulanan', 'triwulan', 'tahunan'] as ReportType[]).map((tipe) => (
+                  <button
+                    key={tipe}
+                    type="button"
+                    onClick={() => setReportConfig((prev) => ({ ...prev, tipe }))}
+                    className={`py-2.5 text-xs font-bold rounded-lg capitalize transition-all cursor-pointer text-center ${
+                      reportConfig.tipe === tipe
+                        ? 'bg-emerald-700 text-white shadow-md'
+                        : 'text-stone-400 hover:text-white hover:bg-stone-800'
+                    }`}
+                  >
+                    {tipe}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Tahun */}
             <div>
               <label className="block text-xs font-semibold text-stone-300 mb-1">
-                Pilih Bulan Laporan
+                Tahun Anggaran
               </label>
               <select
-                value={reportConfig.bulan}
+                value={reportConfig.tahun}
                 onChange={(e) =>
-                  setReportConfig((prev) => ({ ...prev, bulan: parseInt(e.target.value) }))
+                  setReportConfig((prev) => ({ ...prev, tahun: parseInt(e.target.value) }))
                 }
                 className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
               >
-                {MONTH_NAMES.map((m, idx) => (
-                  <option key={m} value={idx + 1}>
-                    Bulan {m}
+                {[2024, 2025, 2026, 2027, 2028].map((y) => (
+                  <option key={y} value={y}>
+                    Tahun {y}
                   </option>
                 ))}
               </select>
             </div>
-          )}
 
-          {reportConfig.tipe === 'triwulan' && (
+            {/* Sub Period Selection */}
+            {reportConfig.tipe === 'bulanan' && (
+              <div>
+                <label className="block text-xs font-semibold text-stone-300 mb-1">
+                  Pilih Bulan Laporan
+                </label>
+                <select
+                  value={reportConfig.bulan}
+                  onChange={(e) =>
+                    setReportConfig((prev) => ({ ...prev, bulan: parseInt(e.target.value) }))
+                  }
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
+                >
+                  {MONTH_NAMES.map((m, idx) => (
+                    <option key={m} value={idx + 1}>
+                      Bulan {m}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {reportConfig.tipe === 'triwulan' && (
+              <div>
+                <label className="block text-xs font-semibold text-stone-300 mb-1">
+                  Pilih Triwulan
+                </label>
+                <select
+                  value={reportConfig.triwulan}
+                  onChange={(e) =>
+                    setReportConfig((prev) => ({ ...prev, triwulan: parseInt(e.target.value) }))
+                  }
+                  className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
+                >
+                  <option value={1}>Triwulan I (Jan - Mar)</option>
+                  <option value={2}>Triwulan II (Apr - Jun)</option>
+                  <option value={3}>Triwulan III (Jul - Sep)</option>
+                  <option value={4}>Triwulan IV (Okt - Des)</option>
+                </select>
+              </div>
+            )}
+
+            {/* Tanggal Penetapan Laporan dengan Ikon Panah Hide */}
             <div>
-              <label className="block text-xs font-semibold text-stone-300 mb-1">
-                Pilih Triwulan
-              </label>
-              <select
-                value={reportConfig.triwulan}
+              <div className="flex items-center justify-between mb-1">
+                <label className="block text-xs font-semibold text-stone-300">
+                  Tanggal Penetapan Laporan
+                </label>
+                <button
+                  type="button"
+                  onClick={() => setIsPanelHidden(true)}
+                  className="p-1 text-emerald-400 hover:text-emerald-300 hover:bg-stone-800 rounded transition-colors cursor-pointer flex items-center justify-center gap-1 text-[11px]"
+                  title="Sembunyikan panel"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  <span>Sembunyikan</span>
+                </button>
+              </div>
+              <input
+                type="date"
+                value={reportConfig.tanggalCetak}
                 onChange={(e) =>
-                  setReportConfig((prev) => ({ ...prev, triwulan: parseInt(e.target.value) }))
+                  setReportConfig((prev) => ({ ...prev, tanggalCetak: e.target.value }))
                 }
-                className="w-full px-3 py-1.5 text-xs rounded-lg border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
-              >
-                <option value={1}>Triwulan I (Jan - Mar)</option>
-                <option value={2}>Triwulan II (Apr - Jun)</option>
-                <option value={3}>Triwulan III (Jul - Sep)</option>
-                <option value={4}>Triwulan IV (Okt - Des)</option>
-              </select>
+                className="w-full px-3 py-2 text-xs rounded-xl border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
+              />
             </div>
-          )}
+          </div>
+        ) : (
+          /* Collapsed State: Compact single bar to save vertical space */
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 bg-stone-900/80 p-2.5 rounded-xl border border-stone-700/70 animate-fade-in shadow-inner">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-[11px] font-bold text-stone-400 uppercase tracking-wider">
+                Kategori Laporan:
+              </span>
+              <span className="px-2.5 py-1 text-xs font-bold bg-emerald-950 text-emerald-300 border border-emerald-600/50 rounded-lg uppercase">
+                {reportConfig.tipe} &bull; {reportConfig.tipe === 'bulanan' ? MONTH_NAMES[reportConfig.bulan - 1] : reportConfig.tipe === 'triwulan' ? `Triwulan ${reportConfig.triwulan}` : 'Tahunan'} {reportConfig.tahun}
+              </span>
+              <span className="text-[11px] text-stone-400 italic hidden md:inline">
+                (Panel disembunyikan agar hemat ruang)
+              </span>
+            </div>
 
-                  {/* Tanggal Penetapan Laporan dengan Ikon Panah Hide */}
-        <div>
-          <div className="flex items-center justify-between mb-1">
-            <div className="flex items-center gap-1.5">
-              <label className="block text-xs font-semibold text-stone-300">
-                Tanggal Penetapan Laporan
+            <div className="flex items-center gap-2.5">
+              <label className="text-xs font-semibold text-stone-300 shrink-0">
+                Tanggal Penetapan:
               </label>
+              <input
+                type="date"
+                value={reportConfig.tanggalCetak}
+                onChange={(e) =>
+                  setReportConfig((prev) => ({ ...prev, tanggalCetak: e.target.value }))
+                }
+                className="px-2.5 py-1 text-xs rounded-lg border border-stone-700 focus:outline-none focus:ring-1 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
+              />
               <button
                 type="button"
-                onClick={() => setIsPanelHidden(true)}
-                className="p-0.5 text-emerald-400 hover:text-emerald-300 hover:bg-stone-800 rounded transition-colors cursor-pointer flex items-center justify-center"
-                title="Sembunyikan panel"
+                onClick={() => setIsPanelHidden(false)}
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-semibold text-emerald-300 hover:text-white bg-emerald-950 hover:bg-emerald-900 rounded-lg border border-emerald-600/60 transition-all cursor-pointer shrink-0 shadow-xs active:scale-95"
+                title="Tampilkan kembali pilihan kategori laporan"
               >
-                <ChevronUp className="w-4 h-4" />
+                <ChevronDown className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Buka Panel</span>
               </button>
             </div>
           </div>
-          <input
-            type="date"
-            value={reportConfig.tanggalCetak}
-            onChange={(e) =>
-              setReportConfig((prev) => ({ ...prev, tanggalCetak: e.target.value }))
-            }
-            className="w-full px-3 py-2 text-xs rounded-xl border border-stone-700 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-stone-900 text-white font-medium"
-          />
-        </div>
+        )}
 
         {/* Live Edit Mode Banner */}
         {isEditMode && (

@@ -210,7 +210,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
       setWaktuSelesai(editingEntry.waktuSelesai || '16:00');
       setUraianPekerjaan(editingEntry.uraianPekerjaan || '');
       setLokasiPekerjaan(editingEntry.lokasiPekerjaan === '-' ? '' : (editingEntry.lokasiPekerjaan || ''));
-      setLuasLahan(editingEntry.luasLahan === '-' ? '' : (editingEntry.luasLahan || ''));
+      setLuasLahan(editingEntry.luasLahan === '-' ? '' : (editingEntry.luasLahan?.replace(/\s*(m²|m2)/gi, '').trim() || ''));
       setKeterangan(editingEntry.keterangan === '-' ? '' : (editingEntry.keterangan || ''));
       setSuratSakit(editingEntry.suratSakit);
       setFotoSebelum(editingEntry.fotoSebelum);
@@ -369,7 +369,9 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
       }
       computedUraian = uraianPekerjaan.trim();
       finalLokasi = lokasiPekerjaan.trim() || '-';
-      finalLuas = luasLahan.trim() || '-';
+      finalLuas = luasLahan.trim()
+        ? (/m²|m2/i.test(luasLahan.trim()) ? luasLahan.trim() : `${luasLahan.trim()} m²`)
+        : '-';
       finalWaktuMulai = waktuMulai;
       finalWaktuSelesai = waktuSelesai;
       finalFotoSebelum = fotoSebelum;
@@ -854,20 +856,6 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                   placeholder="Contoh: Blok C7 (sekitar screen house), Blok C4, Blok B2, dsb"
                   className="w-full px-3 py-2 text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent bg-stone-50/50"
                 />
-                {/* Quick Location Chips */}
-                <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                  <span className="text-[11px] text-stone-400">Pilih cepat:</span>
-                  {COMMON_LOCATIONS.map((loc) => (
-                    <button
-                      key={loc}
-                      type="button"
-                      onClick={() => setLokasiPekerjaan(loc)}
-                      className="text-xs px-2 py-0.5 rounded bg-stone-100 hover:bg-emerald-50 hover:text-emerald-800 text-stone-600 transition-colors cursor-pointer"
-                    >
-                      {loc}
-                    </button>
-                  ))}
-                </div>
               </div>
 
               {/* 3. Luas Lahan (Third) */}
