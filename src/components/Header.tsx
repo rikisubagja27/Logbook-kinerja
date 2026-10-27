@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { UserProfile } from '../types/logbook';
 import { cleanNipDigits, getEpersonalUrlWithNip } from '../utils/storage';
+import { PWAInstallButton } from './PWAInstallButton';
 
 interface HeaderProps {
   activeTab: 'form' | 'list' | 'report' | 'epersonal' | 'profile';
@@ -114,6 +115,9 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
           >
             <span>👤</span> Profil
           </button>
+
+          {/* Tombol Pasang Aplikasi Native / PWA */}
+          <PWAInstallButton variant="compact" />
 
         </div>
 

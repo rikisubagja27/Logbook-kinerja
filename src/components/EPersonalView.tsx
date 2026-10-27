@@ -265,8 +265,8 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
               <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
                 Integrasi Portal E-Personal Kementerian Pertanian
               </h2>
-              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-mono px-2 py-0.5 rounded border border-emerald-500/30">
-                epersonal.pertanian.go.id
+              <span className="text-[10px] bg-emerald-500/20 text-emerald-300 font-bold px-2 py-0.5 rounded border border-emerald-500/30">
+                SIMPEG Kementan
               </span>
             </div>
             <p className="text-xs text-stone-300 leading-relaxed max-w-xl">
