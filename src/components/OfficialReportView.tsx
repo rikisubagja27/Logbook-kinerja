@@ -400,12 +400,12 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     setHasCustomEdits(false);
   };
 
-  // Paginate Table 1 so each A4 sheet holds at most 12 rows, preventing table cut-offs
+  // Paginate Table 1 so each A4 sheet holds at most 10 rows, preventing table cut-offs & overflow
   const table1Pages = useMemo(() => {
     if (customTable1.length === 0) return [[]];
-    if (customTable1.length <= 12) return [customTable1];
+    if (customTable1.length <= 10) return [customTable1];
     const pages: Table1RowItem[][] = [];
-    const chunkSize = 12;
+    const chunkSize = 10;
     for (let i = 0; i < customTable1.length; i += chunkSize) {
       pages.push(customTable1.slice(i, i + chunkSize));
     }
@@ -908,47 +908,47 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman 1: Sampul Laporan Resmi —
           </div>
-          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm]">
-            <div className="space-y-3 mt-4">
+          <div className="report-page report-cover-page bg-white w-full max-w-[794px] h-[1123px] mx-auto p-10 sm:p-14 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] print:h-[297mm] print:max-h-[297mm] print:overflow-hidden">
+            <div className="space-y-2 mt-2">
               <h1 className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
                 LAPORAN KINERJA
               </h1>
               <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
                 PELAKSANAAN TUGAS OPERASIONAL KANTOR
               </h2>
-              <h3 className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
+              <h3 className="text-lg sm:text-xl font-bold uppercase tracking-wide leading-snug text-stone-900">
                 {periodTitle}
               </h3>
             </div>
 
             {/* Official Wikipedia Kementan Logo */}
-            <div className="my-10 flex items-center justify-center">
-              <MinistryLogo size={145} />
+            <div className="my-6 flex items-center justify-center">
+              <MinistryLogo size={130} />
             </div>
 
             {/* Author Block */}
             <div className="space-y-1">
               <p className="text-sm text-stone-700">Disusun oleh :</p>
-              <p className="text-lg font-bold tracking-wider uppercase text-stone-900 mt-2">
+              <p className="text-lg font-bold tracking-wider uppercase text-stone-900 mt-1">
                 {profile.nama || 'PEGAWAI KPS PVT I MANOKO'}
               </p>
               <p className="text-base text-stone-800 font-mono tracking-wide">
                 {formatNipNumberOnly(profile.nip)}
               </p>
-              <p className="text-base text-stone-700 mt-3 font-medium">
+              <p className="text-sm text-stone-700 mt-2 font-medium">
                 {profile.jabatan || 'Pengelola Pemeliharaan Kebun'}
               </p>
             </div>
 
             {/* Cover Footer */}
-            <div className="mt-12 mb-4 space-y-1 text-stone-900">
-              <p className="text-base font-bold tracking-wide uppercase">
+            <div className="mt-8 mb-2 space-y-1 text-stone-900">
+              <p className="text-sm sm:text-base font-bold tracking-wide uppercase">
                 {profile.instansiInduk || 'PUSAT PERLINDUNGAN VARIETAS TANAMAN DAN PERIZINAN PERTANIAN'}
               </p>
-              <p className="text-base font-bold tracking-wide uppercase">
+              <p className="text-sm sm:text-base font-bold tracking-wide uppercase">
                 {profile.kementerian || 'KEMENTERIAN PERTANIAN'}
               </p>
-              <p className="text-base font-bold tracking-wider mt-2">
+              <p className="text-sm sm:text-base font-bold tracking-wider mt-1">
                 {reportConfig.tahun}
               </p>
             </div>
@@ -960,7 +960,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman 2: BAB I Pendahuluan —
           </div>
-          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm] page-break">
+          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
             <div className="text-center mb-8">
               <h2 className="text-lg font-bold uppercase tracking-wider">BAB I</h2>
               <h3 className="text-lg font-bold uppercase tracking-wider">PENDAHULUAN</h3>
@@ -1040,7 +1040,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
                 — Halaman {3 + pageIdx}: BAB II Akuntabilitas Kinerja (Tabel 1{pageIdx > 0 ? ' Lanjutan' : ''}) —
               </div>
-              <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm] page-break">
+              <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
                 {pageIdx === 0 && (
                   <div className="text-center mb-6">
                     <h2 className="text-lg font-bold uppercase tracking-wider">BAB II</h2>
@@ -1232,7 +1232,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                 <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
                   — Halaman {3 + table1Pages.length + pageIdx}: Tabel 2 Dokumentasi Kegiatan{pageIdx > 0 ? ' (Lanjutan)' : ''} —
                 </div>
-                <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm] page-break">
+                <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1388,7 +1388,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman Terakhir: BAB III Penutup & Lembar Pengesahan —
           </div>
-          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm] page-break">
+          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
             <div>
               <div className="text-center mb-8">
                 <h2 className="text-lg font-bold uppercase tracking-wider">BAB III</h2>

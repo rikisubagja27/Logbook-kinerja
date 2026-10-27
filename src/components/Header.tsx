@@ -15,7 +15,7 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
   const currentName = profile?.nama || 'Pegawai';
 
   return (
-    <header className="bg-stone-900 border-b border-emerald-500/20 text-white sticky top-0 z-50">
+    <header className="bg-stone-900 border-b border-emerald-500/20 text-white sticky top-0 z-50 no-print print:hidden">
       <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
         
         {/* Bagian Logo, Judul & Status Akun Aktif */}

@@ -498,7 +498,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
             <Sparkles className="w-4 h-4 text-emerald-400" />
             <span>KPS PVT I MANOKO · LEMBANG</span>
           </div>
-          <h1 className="text-1x1 font-extrabold text-white tracking-tight drop-shadow-sm">
+          <h1 className="text-xl font-extrabold text-white tracking-tight drop-shadow-sm">
             {editingEntry ? 'Edit Catatan Logbook Kinerja' : 'Isi & Catat Logbook Kinerja Harian'}
           </h1>
           
@@ -611,7 +611,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                 </button>
                 <button
                   type="button"
-                  onClick={() => setStandardHours('08:00', '12:00')}
+                  onClick={() => setStandardHours('07:30', '12:00')}
                   className="px-2.5 py-1 bg-stone-100 hover:bg-stone-200 text-stone-700 rounded-md transition-colors cursor-pointer"
                 >
                   07:30 - 12:00 (Setengah Hari)

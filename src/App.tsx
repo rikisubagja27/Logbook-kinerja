@@ -85,7 +85,7 @@ export default function App() {
       {/* Main Content Area */}
       <main className="flex-1 pb-16 space-y-4">
         {/* PWA Standalone Banner (auto-hides when installed in standalone mode) */}
-        <div className="max-w-7xl mx-auto px-4 pt-3 sm:px-6">
+        <div className="max-w-7xl mx-auto px-4 pt-3 sm:px-6 no-print print:hidden">
           <PWAInstallButton variant="banner" />
         </div>
 

@@ -71,14 +71,38 @@
 
 /* Custom styles for A4 Report Preview & Print */
 @media print {
-  body {
+  /* Margin 0 removes browser default headers, footers, and URL watermarks (https://...) */
+  @page {
+    size: A4 portrait;
+    margin: 0 !important;
+  }
+
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force entire wrapper to pure paper white with zero outside margin/padding */
+  html, body, #root, .app-bg-gradient, main {
     background: #ffffff !important;
+    background-color: #ffffff !important;
+    background-image: none !important;
     color: #000000 !important;
-    font-size: 12pt;
+    padding: 0 !important;
+    margin: 0 !important;
+    min-height: auto !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    font-size: 11pt;
     line-height: 1.5;
   }
 
-  .no-print {
+  /* Hide headers, footers, install buttons, navigation, and controls */
+  header,
+  footer,
+  nav,
+  .no-print,
+  [data-no-print] {
     display: none !important;
   }
 
@@ -86,16 +110,30 @@
     display: block !important;
   }
 
+  /* Exactly 1 A4 sheet per report-page */
   .report-page {
     width: 210mm !important;
     min-height: 297mm !important;
-    padding: 25mm 25mm 25mm 30mm !important;
-    margin: 0 !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
+    padding: 20mm 20mm 20mm 25mm !important;
+    margin: 0 auto !important;
+    box-sizing: border-box !important;
     box-shadow: none !important;
     border: none !important;
     background: #ffffff !important;
     page-break-after: always !important;
     break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden !important;
+    position: relative !important;
+  }
+
+  .report-cover-page {
+    height: 297mm !important;
+    max-height: 297mm !important;
+    overflow: hidden !important;
   }
 
   .page-break {
@@ -104,21 +142,17 @@
   }
 
   table {
-    page-break-inside: auto;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   tr {
-    page-break-inside: avoid;
-    page-break-after: auto;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   thead {
     display: table-header-group;
-  }
-
-  @page {
-    size: A4 portrait;
-    margin: 15mm 20mm 15mm 25mm;
   }
 }
 
