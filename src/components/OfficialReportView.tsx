@@ -519,12 +519,30 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               p.style.backgroundColor = '#ffffff';
               p.style.margin = '0 auto';
               p.style.fontFamily = 'Arial, sans-serif';
+              p.style.boxSizing = 'border-box';
+              if (p.classList.contains('report-cover-page')) {
+                p.style.display = 'flex';
+                p.style.flexDirection = 'column';
+                p.style.justifyContent = 'space-between';
+                p.style.alignItems = 'center';
+                p.style.textAlign = 'center';
+                p.style.height = '1123px';
+                p.style.maxHeight = '1123px';
+                p.style.overflow = 'hidden';
+                p.style.padding = '48px 40px';
+              }
             });
 
             // Enforce Arial MT for all titles/headings and Arial for content
             const clonedHeadings = clonedDoc.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, th, .report-title');
             clonedHeadings.forEach((h) => {
               h.style.fontFamily = "'Arial MT', Arial, 'Helvetica Neue', Helvetica, sans-serif";
+              h.style.color = '#000000';
+            });
+
+            const coverText = clonedDoc.querySelectorAll<HTMLElement>('.report-cover-page h1, .report-cover-page h2, .report-cover-page h3, .report-cover-page p');
+            coverText.forEach((t) => {
+              t.style.textAlign = 'center';
             });
 
             const clonedBodies = clonedDoc.querySelectorAll<HTMLElement>('p, td, input, textarea, span, div');
@@ -579,24 +597,6 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                 s.textContent = cleanColorString(s.textContent);
               }
             });
-
-            // Sanitize styleSheets cssRules directly in cloned document
-            try {
-              const sheets = Array.from(clonedDoc.styleSheets || []);
-              sheets.forEach((sheet) => {
-                try {
-                  const rules = sheet.cssRules || (sheet as any).rules;
-                  if (rules) {
-                    for (let r = rules.length - 1; r >= 0; r--) {
-                      const rule = rules[r];
-                      if (rule && rule.cssText && (rule.cssText.includes('oklch') || rule.cssText.includes('oklab'))) {
-                        sheet.deleteRule(r);
-                      }
-                    }
-                  }
-                } catch {}
-              });
-            } catch {}
 
             // Sanitize inline styles on all nodes
             const allNodes = clonedDoc.querySelectorAll('*');
@@ -944,50 +944,65 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         
         {/* ==================== PAGE 1: COVER (SAMPUL LAPORAN) ==================== */}
         <div className="relative">
-          <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+          <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman 1: Sampul Laporan Resmi —
           </div>
-          <div className="report-page report-cover-page bg-white w-full max-w-[794px] h-[1123px] mx-auto p-10 sm:p-14 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] print:h-[297mm] print:max-h-[297mm] print:overflow-hidden">
-            <div className="space-y-2 mt-2">
-              <h1 className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
+          <div 
+            className="report-page report-cover-page bg-white w-full max-w-[794px] min-h-[1050px] sm:min-h-[1123px] mx-auto p-10 sm:p-14 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0"
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              textAlign: 'center',
+              minHeight: '1123px',
+              height: '1123px',
+              maxHeight: '1123px',
+              boxSizing: 'border-box',
+              padding: '48px 40px',
+              backgroundColor: '#ffffff'
+            }}
+          >
+            <div style={{ textAlign: 'center', width: '100%' }} className="space-y-2 mt-2">
+              <h1 style={{ textAlign: 'center' }} className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
                 LAPORAN KINERJA
               </h1>
-              <h2 className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
+              <h2 style={{ textAlign: 'center' }} className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
                 PELAKSANAAN TUGAS OPERASIONAL KANTOR
               </h2>
-              <h3 className="text-lg sm:text-xl font-bold uppercase tracking-wide leading-snug text-stone-900">
+              <h3 style={{ textAlign: 'center' }} className="text-lg sm:text-xl font-bold uppercase tracking-wide leading-snug text-stone-900">
                 {periodTitle}
               </h3>
             </div>
 
             {/* Official Wikipedia Kementan Logo */}
-            <div className="my-6 flex items-center justify-center">
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', width: '100%' }} className="my-6">
               <MinistryLogo size={130} />
             </div>
 
             {/* Author Block */}
-            <div className="space-y-1">
-              <p className="text-sm text-stone-700">Disusun oleh :</p>
-              <p className="text-lg font-bold tracking-wider uppercase text-stone-900 mt-1">
+            <div style={{ textAlign: 'center', width: '100%' }} className="space-y-1">
+              <p style={{ textAlign: 'center' }} className="text-sm text-stone-700">Disusun oleh :</p>
+              <p style={{ textAlign: 'center' }} className="text-lg font-bold tracking-wider uppercase text-stone-900 mt-1">
                 {profile.nama || 'PEGAWAI KPS PVT I MANOKO'}
               </p>
-              <p className="text-base text-stone-800 font-mono tracking-wide">
+              <p style={{ textAlign: 'center' }} className="text-base text-stone-800 font-mono tracking-wide">
                 {formatNipNumberOnly(profile.nip)}
               </p>
-              <p className="text-sm text-stone-700 mt-2 font-medium">
+              <p style={{ textAlign: 'center' }} className="text-sm text-stone-700 mt-2 font-medium">
                 {profile.jabatan || 'Pengelola Pemeliharaan Kebun'}
               </p>
             </div>
 
             {/* Cover Footer */}
-            <div className="mt-8 mb-2 space-y-1 text-stone-900">
-              <p className="text-sm sm:text-base font-bold tracking-wide uppercase">
+            <div style={{ textAlign: 'center', width: '100%' }} className="mt-8 mb-2 space-y-1 text-stone-900">
+              <p style={{ textAlign: 'center' }} className="text-sm sm:text-base font-bold tracking-wide uppercase">
                 {profile.instansiInduk || 'PUSAT PERLINDUNGAN VARIETAS TANAMAN DAN PERIZINAN PERTANIAN'}
               </p>
-              <p className="text-sm sm:text-base font-bold tracking-wide uppercase">
+              <p style={{ textAlign: 'center' }} className="text-sm sm:text-base font-bold tracking-wide uppercase">
                 {profile.kementerian || 'KEMENTERIAN PERTANIAN'}
               </p>
-              <p className="text-sm sm:text-base font-bold tracking-wider mt-1">
+              <p style={{ textAlign: 'center' }} className="text-sm sm:text-base font-bold tracking-wider mt-1">
                 {reportConfig.tahun}
               </p>
             </div>
@@ -996,10 +1011,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
         {/* ==================== PAGE 2: BAB I PENDAHULUAN ==================== */}
         <div className="relative">
-          <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+          <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman 2: BAB I Pendahuluan —
           </div>
-          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
+          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
             <div className="text-center mb-8">
               <h2 className="text-lg font-bold uppercase tracking-wider">BAB I</h2>
               <h3 className="text-lg font-bold uppercase tracking-wider">PENDAHULUAN</h3>
@@ -1072,14 +1087,14 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
         {/* ==================== PAGE 3+: BAB II AKUNTABILITAS KINERJA (TABEL 1) ==================== */}
         {table1Pages.map((pageRows, pageIdx) => {
-          const globalStartIndex = pageIdx * 12;
+          const globalStartIndex = pageIdx * 10;
 
           return (
             <div key={`table1-page-${pageIdx}`} className="relative">
-              <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+              <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
                 — Halaman {3 + pageIdx}: BAB II Akuntabilitas Kinerja (Tabel 1{pageIdx > 0 ? ' Lanjutan' : ''}) —
               </div>
-              <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
+              <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
                 {pageIdx === 0 && (
                   <div className="text-center mb-6">
                     <h2 className="text-lg font-bold uppercase tracking-wider">BAB II</h2>
@@ -1104,23 +1119,23 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                     </div>
                   )}
 
-                  {/* Official Table 1 with strict black borders */}
+                  {/* Official Table 1 with strict black borders and consistent column ratios */}
                   <div className="border border-stone-900">
-                    <table className="w-full text-left text-xs border-collapse">
+                    <table className="w-full text-left text-xs border-collapse table-fixed" style={{ width: '100%', tableLayout: 'fixed' }}>
                       <thead>
                         <tr className="border-b border-stone-900 bg-stone-100 font-bold">
-                          <th className="border-r border-stone-900 p-2 text-center w-12">No.</th>
-                          <th className="border-r border-stone-900 p-2 text-center w-28">
+                          <th className="border-r border-stone-900 p-2 text-center w-[8%]" style={{ width: '8%' }}>No.</th>
+                          <th className="border-r border-stone-900 p-2 text-center w-[22%]" style={{ width: '22%' }}>
                             {reportConfig.tipe === 'bulanan'
                               ? 'Tanggal'
                               : reportConfig.tipe === 'triwulan'
                               ? 'Bulan'
                               : 'Periode'}
                           </th>
-                          <th className="border-r border-stone-900 p-2 text-center">
+                          <th className="border-r border-stone-900 p-2 text-center w-[54%]" style={{ width: '54%' }}>
                             Rincian Pekerjaan
                           </th>
-                          <th className="p-2 text-center w-24">Keterangan</th>
+                          <th className="p-2 text-center w-[16%]" style={{ width: '16%' }}>Keterangan</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1128,10 +1143,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                           const actualIdx = globalStartIndex + rowIdx;
                           return (
                             <tr key={actualIdx} className="border-b border-stone-900 align-top">
-                              <td className="border-r border-stone-900 p-2.5 text-center font-medium">
+                              <td className="border-r border-stone-900 p-2.5 text-center font-medium break-words">
                                 {actualIdx + 1}
                               </td>
-                              <td className="border-r border-stone-900 p-2.5 font-semibold text-center">
+                              <td className="border-r border-stone-900 p-2.5 font-semibold text-center break-words">
                                 {isEditMode ? (
                                   <input
                                     type="text"
@@ -1148,7 +1163,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                   row.label
                                 )}
                               </td>
-                              <td className="border-r border-stone-900 p-2.5 space-y-1.5">
+                              <td className="border-r border-stone-900 p-2.5 space-y-1.5 break-words">
                                 {isEditMode ? (
                                   <textarea
                                     rows={2}
@@ -1223,10 +1238,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         {/* ==================== PAGE 4+: TABEL 2 DOKUMENTASI KEGIATAN (2 PHOTOS PER A4 PAGE) ==================== */}
         {photoPages.length === 0 ? (
           <div className="relative">
-            <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+            <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
               — Halaman {3 + table1Pages.length}: Tabel 2 Dokumentasi Kegiatan —
             </div>
-            <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[25mm_20mm_20mm_25mm] page-break">
+            <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1268,10 +1283,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
             return (
               <div key={`photo-page-${pageIdx}`} className="relative">
-                <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+                <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
                   — Halaman {3 + table1Pages.length + pageIdx}: Tabel 2 Dokumentasi Kegiatan{pageIdx > 0 ? ' (Lanjutan)' : ''} —
                 </div>
-                <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
+                <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
@@ -1299,13 +1314,13 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
                     {/* Table 2 layout with 2 photos per sheet */}
                     <div className="border border-stone-900">
-                      <table className="w-full text-left text-xs border-collapse">
+                      <table className="w-full text-left text-xs border-collapse table-fixed" style={{ width: '100%', tableLayout: 'fixed' }}>
                         <thead>
                           <tr className="border-b border-stone-900 bg-stone-100 font-bold">
-                            <th className="border-r border-stone-900 p-2.5 text-center w-[46%]">
-                              Foto
+                            <th className="border-r border-stone-900 p-2.5 text-center w-[48%]" style={{ width: '48%' }}>
+                              Foto Dokumentasi
                             </th>
-                            <th className="p-2.5 text-center">Keterangan</th>
+                            <th className="p-2.5 text-center w-[52%]" style={{ width: '52%' }}>Keterangan</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1314,7 +1329,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                             return (
                               <tr key={doc.id || actualIdx} className="border-b border-stone-900 align-middle">
                                 {/* Foto Cell with Clean Container */}
-                                <td className="border-r border-stone-900 p-4 text-center bg-white w-[46%]">
+                                <td className="border-r border-stone-900 p-3 sm:p-4 text-center bg-white w-[48%]">
                                   <div className="relative max-w-[270px] mx-auto overflow-hidden border border-stone-700 bg-stone-50 flex items-center justify-center min-h-[160px] max-h-[195px] group">
                                     <img
                                       src={doc.foto}
@@ -1424,10 +1439,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
         {/* ==================== FINAL PAGE: BAB III PENUTUP & TANDA TANGAN RESMI ==================== */}
         <div className="relative">
-          <div className="no-print text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+          <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman Terakhir: BAB III Penutup & Lembar Pengesahan —
           </div>
-          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-justify leading-relaxed print:shadow-none print:border-none print:m-0 print:p-[20mm_20mm_20mm_25mm] page-break">
+          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
             <div>
               <div className="text-center mb-8">
                 <h2 className="text-lg font-bold uppercase tracking-wider">BAB III</h2>

@@ -88,11 +88,11 @@
   background-color: #f9fafb !important;
 }
 
-/* Custom styles for A4 Report Preview & Print */
+/* Precision Print Styles across all paper sizes (A4, Letter / "Huruf", Folio) */
 @media print {
-  /* Margin 0 removes browser default headers, footers, and URL watermarks (https://...) */
+  /* Margin 0 suppresses browser default header (date/title) and footer (URL watermark) */
   @page {
-    size: A4 portrait;
+    size: portrait;
     margin: 0 !important;
   }
 
@@ -109,33 +109,56 @@
     color: #000000 !important;
     padding: 0 !important;
     margin: 0 !important;
-    min-height: auto !important;
+    min-height: 0 !important;
+    height: auto !important;
     box-shadow: none !important;
     width: 100% !important;
     font-size: 11pt;
     line-height: 1.5;
   }
 
-  /* Hide headers, footers, install buttons, navigation, and controls */
+  /* Comprehensive suppression of all UI elements: headers, footers, navbars, banners, buttons, controls */
   header,
   footer,
   nav,
+  aside,
+  button,
+  input,
+  select,
+  textarea,
   .no-print,
-  [data-no-print] {
+  [data-no-print],
+  .print\:hidden,
+  .offline-indicator,
+  .pwa-banner,
+  .pwa-button,
+  #pwa-install-banner,
+  #offline-indicator,
+  .aistudio-badge {
     display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    max-height: 0 !important;
+    width: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+    overflow: hidden !important;
+    position: static !important;
   }
 
   .print-only {
     display: block !important;
   }
 
-  /* Exactly 1 A4 sheet per report-page */
+  /* Consistent Page Layout across A4 (210x297mm), Letter (215.9x279.4mm), and Folio */
   .report-page {
-    width: 210mm !important;
-    min-height: 297mm !important;
-    height: 297mm !important;
-    max-height: 297mm !important;
-    padding: 20mm 20mm 20mm 25mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-height: auto !important;
+    height: auto !important;
+    max-height: none !important;
+    padding: 18mm 15mm 18mm 20mm !important; /* Top, Right, Bottom, Left: 20mm left margin for official binding */
     margin: 0 auto !important;
     box-sizing: border-box !important;
     box-shadow: none !important;
@@ -145,14 +168,29 @@
     break-after: page !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
-    overflow: hidden !important;
     position: relative !important;
+    overflow: visible !important;
   }
 
+  /* Cover Page occupies exactly 1 single sheet on any paper size */
   .report-cover-page {
-    height: 297mm !important;
-    max-height: 297mm !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100vh !important;
+    min-height: 100vh !important;
+    max-height: 100vh !important;
+    box-sizing: border-box !important;
+    padding: 22mm 18mm 20mm 20mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+    align-items: center !important;
+    text-align: center !important;
     overflow: hidden !important;
+    page-break-after: always !important;
+    break-after: page !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   .page-break {
@@ -160,9 +198,22 @@
     break-before: page !important;
   }
 
+  /* Precision Table Styles: consistent column ratios and strict page-break control */
   table {
+    width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+    border: 1px solid #000000 !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
   }
 
   tr {
@@ -170,8 +221,18 @@
     break-inside: avoid !important;
   }
 
-  thead {
-    display: table-header-group;
+  th, td {
+    border: 1px solid #000000 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Photo inside documentation table */
+  img {
+    max-width: 100% !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 }
 
