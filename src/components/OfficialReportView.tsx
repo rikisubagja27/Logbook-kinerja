@@ -64,6 +64,56 @@ export function formatNipNumberOnly(nip?: string): string {
   return cleaned || '-';
 }
 
+/**
+ * Pure mathematical OKLCH to sRGB converter
+ * Guarantees html2canvas never receives unsupported oklch() color functions
+ */
+export function oklchToRgb(str: string): string {
+  const m = str.match(/oklch\(\s*([\d.]+)%?\s+([\d.]+)\s+([\d.]+)(?:\s*\/\s*([\d.]+%?))?\s*\)/i);
+  if (!m) return 'rgb(28, 25, 23)';
+  let L = parseFloat(m[1]);
+  if (m[0].includes('%') && parseFloat(m[1]) > 1) L = L / 100;
+  else if (L > 1) L = L / 100;
+  const C = parseFloat(m[2]);
+  const H = parseFloat(m[3]);
+  const a = C * Math.cos((H * Math.PI) / 180);
+  const b = C * Math.sin((H * Math.PI) / 180);
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b;
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b;
+  const s_ = L - 0.0894841775 * a - 1.2914855480 * b;
+  const l = l_ * l_ * l_;
+  const m3 = m_ * m_ * m_;
+  const s = s_ * s_ * s_;
+  const r = +4.0767434772 * l - 3.3077115913 * m3 + 0.2309699292 * s;
+  const g = -1.2684380046 * l + 2.6097574011 * m3 - 0.3413193965 * s;
+  const bl = -0.0041960863 * l - 0.7034186147 * m3 + 1.7076147010 * s;
+  const gamma = (c: number) => {
+    c = Math.max(0, Math.min(1, c));
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * Math.pow(c, 1 / 2.4) - 0.055;
+  };
+  const R = Math.round(gamma(r) * 255);
+  const G = Math.round(gamma(g) * 255);
+  const B = Math.round(gamma(bl) * 255);
+  return `rgb(${R}, ${G}, ${B})`;
+}
+
+export function cleanColorString(val: any): string {
+  if (!val || typeof val !== 'string') return val;
+  if (
+    !val.includes('oklch') &&
+    !val.includes('oklab') &&
+    !val.includes('color-mix') &&
+    !val.includes('light-dark')
+  ) {
+    return val;
+  }
+  let res = val.replace(/oklch\([^)]+\)/gi, (match) => oklchToRgb(match));
+  res = res.replace(/oklab\([^)]+\)/gi, 'rgb(28, 25, 23)');
+  res = res.replace(/color-mix\([^)]+\)/gi, 'rgb(28, 25, 23)');
+  res = res.replace(/light-dark\([^)]+\)/gi, 'rgb(28, 25, 23)');
+  return res;
+}
+
 function formatIndonesianDate(dateStr: string): string {
   if (!dateStr) return '';
   try {
@@ -490,33 +540,6 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               el.style.display = 'none';
             });
 
-            // Sanitize Tailwind v4 OKLAB / OKLCH / color-mix
-            const dummyCanvas = document.createElement('canvas');
-            dummyCanvas.width = 1;
-            dummyCanvas.height = 1;
-            const dummyCtx = dummyCanvas.getContext('2d');
-
-            const convertToSafeColor = (val: string): string => {
-              if (!val || typeof val !== 'string') return val;
-              if (
-                !val.includes('oklch') &&
-                !val.includes('oklab') &&
-                !val.includes('color-mix') &&
-                !val.includes('light-dark')
-              ) {
-                return val;
-              }
-              if (!dummyCtx) return '#111827';
-              try {
-                dummyCtx.fillStyle = '#000000';
-                dummyCtx.fillStyle = val;
-                const converted = dummyCtx.fillStyle;
-                return converted || '#111827';
-              } catch {
-                return '#111827';
-              }
-            };
-
             const win = clonedDoc.defaultView;
             if (win && typeof win.getComputedStyle === 'function') {
               const origGetComputedStyle = win.getComputedStyle.bind(win);
@@ -524,18 +547,24 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                 const style = origGetComputedStyle(el, pseudo);
                 return new Proxy(style, {
                   get(target: any, prop: string | symbol) {
+                    if (prop === 'getPropertyValue') {
+                      return function (propName: string) {
+                        const val = target.getPropertyValue(propName);
+                        return cleanColorString(val);
+                      };
+                    }
                     const val = target[prop];
                     if (typeof val === 'function') {
                       return function (...args: any[]) {
                         const res = val.apply(target, args);
                         if (typeof res === 'string') {
-                          return convertToSafeColor(res);
+                          return cleanColorString(res);
                         }
                         return res;
                       };
                     }
                     if (typeof val === 'string') {
-                      return convertToSafeColor(val);
+                      return cleanColorString(val);
                     }
                     return val;
                   },
@@ -543,34 +572,44 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               };
             }
 
+            // Clean all text inside <style> tags in cloned document
             const styleTags = clonedDoc.querySelectorAll('style');
             styleTags.forEach((s) => {
-              if (s.textContent) {
-                const text = s.textContent;
-                if (
-                  text.includes('oklab') ||
-                  text.includes('oklch') ||
-                  text.includes('color-mix') ||
-                  text.includes('light-dark')
-                ) {
-                  s.textContent = text
-                    .replace(/oklab\([^)]*(?:\([^)]*\))*[^)]*\)/gi, '#1f2937')
-                    .replace(/oklch\([^)]*(?:\([^)]*\))*[^)]*\)/gi, '#1f2937')
-                    .replace(/color-mix\([^)]*(?:\([^)]*\))*[^)]*\)/gi, '#1f2937')
-                    .replace(/light-dark\([^)]*(?:\([^)]*\))*[^)]*\)/gi, '#1f2937');
-                }
+              if (s.textContent && (s.textContent.includes('oklch') || s.textContent.includes('oklab') || s.textContent.includes('color-mix') || s.textContent.includes('light-dark'))) {
+                s.textContent = cleanColorString(s.textContent);
               }
             });
 
+            // Sanitize styleSheets cssRules directly in cloned document
+            try {
+              const sheets = Array.from(clonedDoc.styleSheets || []);
+              sheets.forEach((sheet) => {
+                try {
+                  const rules = sheet.cssRules || (sheet as any).rules;
+                  if (rules) {
+                    for (let r = rules.length - 1; r >= 0; r--) {
+                      const rule = rules[r];
+                      if (rule && rule.cssText && (rule.cssText.includes('oklch') || rule.cssText.includes('oklab'))) {
+                        sheet.deleteRule(r);
+                      }
+                    }
+                  }
+                } catch {}
+              });
+            } catch {}
+
+            // Sanitize inline styles on all nodes
             const allNodes = clonedDoc.querySelectorAll('*');
             allNodes.forEach((node) => {
               const el = node as HTMLElement;
               if (!el.style) return;
               try {
-                if (el.style.color) el.style.color = convertToSafeColor(el.style.color);
-                if (el.style.backgroundColor) el.style.backgroundColor = convertToSafeColor(el.style.backgroundColor);
-                if (el.style.borderColor) el.style.borderColor = convertToSafeColor(el.style.borderColor);
-                if (el.style.outlineColor) el.style.outlineColor = convertToSafeColor(el.style.outlineColor);
+                ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor', 'fill', 'stroke'].forEach((attr) => {
+                  const current = (el.style as any)[attr];
+                  if (current && typeof current === 'string' && (current.includes('oklch') || current.includes('oklab') || current.includes('color-mix') || current.includes('light-dark'))) {
+                    (el.style as any)[attr] = cleanColorString(current);
+                  }
+                });
               } catch {}
             });
           },

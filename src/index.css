@@ -69,6 +69,25 @@
   padding: 6px 8px !important;
 }
 
+/* Force standard HEX colors for all stone & emerald classes inside report-page to prevent OKLCH errors */
+.report-page [class*="text-stone-"],
+.report-page [class*="text-emerald-"] {
+  color: #111827 !important;
+}
+
+.report-page [class*="border-stone-"],
+.report-page [class*="border-emerald-"] {
+  border-color: #111827 !important;
+}
+
+.report-page .bg-stone-100 {
+  background-color: #f3f4f6 !important;
+}
+
+.report-page .bg-stone-50 {
+  background-color: #f9fafb !important;
+}
+
 /* Custom styles for A4 Report Preview & Print */
 @media print {
   /* Margin 0 removes browser default headers, footers, and URL watermarks (https://...) */
