@@ -210,7 +210,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
       setWaktuSelesai(editingEntry.waktuSelesai || '16:00');
       setUraianPekerjaan(editingEntry.uraianPekerjaan || '');
       setLokasiPekerjaan(editingEntry.lokasiPekerjaan === '-' ? '' : (editingEntry.lokasiPekerjaan || ''));
-      setLuasLahan(editingEntry.luasLahan === '-' ? '' : (editingEntry.luasLahan?.replace(/\s*(m²|m2)/gi, '').trim() || ''));
+      setLuasLahan(editingEntry.luasLahan === '-' ? '-' : (editingEntry.luasLahan?.replace(/\s*(m²|m2)/gi, '').trim() || ''));
       setKeterangan(editingEntry.keterangan === '-' ? '' : (editingEntry.keterangan || ''));
       setSuratSakit(editingEntry.suratSakit);
       setFotoSebelum(editingEntry.fotoSebelum);
@@ -369,9 +369,10 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
       }
       computedUraian = uraianPekerjaan.trim();
       finalLokasi = lokasiPekerjaan.trim() || '-';
-      finalLuas = luasLahan.trim()
-        ? (/m²|m2/i.test(luasLahan.trim()) ? luasLahan.trim() : `${luasLahan.trim()} m²`)
-        : '-';
+      const trimmedLuas = luasLahan.trim();
+      finalLuas = (!trimmedLuas || trimmedLuas === '-' || trimmedLuas === '—')
+        ? '-'
+        : (/m²|m2/i.test(trimmedLuas) ? trimmedLuas : `${trimmedLuas} m²`);
       finalWaktuMulai = waktuMulai;
       finalWaktuSelesai = waktuSelesai;
       finalFotoSebelum = fotoSebelum;
@@ -856,27 +857,66 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
                 />
               </div>
 
-              {/* 3. Luas Lahan (Third) */}
-            <div>
-  <label className="block text-xs font-semibold text-stone-700">
-    Luas Lahan
-  </label>
-  <div className="relative flex items-center">
-    <input 
-  type="number" 
-  value={luasLahan} 
-  onChange={(e) => setLuasLahan(e.target.value)} 
-  placeholder="Contoh: 500"
-  className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 pr-12 bg-white"
-  required
-/>
-    {/* Satuan m2 muncul otomatis di sebelah kanan kotak input secara permanen */}
-    <span className="absolute right-3 text-stone-500 text-xs font-medium pointer-events-none bg-stone-100 px-1.5 py-0.5 rounded">
-      m²
-    </span>
-  </div>
-  <p className="text-xs text-stone-500 mt-1">Cukup masukkan angka saja (satuan m² otomatis).</p>
-</div>
+              {/* 3. Luas Lahan (Third) - Opsional / Boleh Kosong atau Simbol (-) */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-semibold text-stone-700">
+                    Luas Lahan <span className="text-stone-400 font-normal">(Opsional jika tidak diketahui)</span>
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setLuasLahan('-')}
+                      className={`text-[11px] px-2 py-0.5 rounded font-medium transition-colors cursor-pointer border ${
+                        luasLahan.trim() === '-'
+                          ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                          : 'bg-stone-100 hover:bg-stone-200 text-stone-600 border-stone-300'
+                      }`}
+                      title="Isi simbol (-) jika luas lahan tidak diketahui"
+                    >
+                      Isi (-)
+                    </button>
+                    {luasLahan && (
+                      <button
+                        type="button"
+                        onClick={() => setLuasLahan('')}
+                        className="text-[11px] px-2 py-0.5 rounded font-medium text-stone-500 hover:text-red-600 bg-stone-100 hover:bg-red-50 border border-stone-200 transition-colors cursor-pointer"
+                        title="Kosongkan kolom luas lahan"
+                      >
+                        Kosongkan
+                      </button>
+                    )}
+                  </div>
+                </div>
+                <div className="relative flex items-center">
+                  <input
+                    type="text"
+                    value={luasLahan}
+                    onChange={(e) => setLuasLahan(e.target.value)}
+                    placeholder="Contoh: 500, atau ketik - / kosongkan jika tidak diketahui"
+                    className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-stone-300 pr-16 bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                  />
+                  {/* Satuan m² otomatis muncul jika diisi angka */}
+                  {luasLahan.trim() && luasLahan.trim() !== '-' && !/m²|m2/i.test(luasLahan) && (
+                    <span className="absolute right-3 text-stone-600 text-xs font-medium pointer-events-none bg-stone-100 px-2 py-0.5 rounded border border-stone-200">
+                      m²
+                    </span>
+                  )}
+                  {luasLahan.trim() === '-' && (
+                    <span className="absolute right-3 text-stone-500 text-[11px] font-medium pointer-events-none bg-stone-100 px-2 py-0.5 rounded border border-stone-200">
+                      -
+                    </span>
+                  )}
+                  {!luasLahan.trim() && (
+                    <span className="absolute right-3 text-stone-400 text-[11px] font-normal pointer-events-none bg-stone-50 px-1.5 py-0.5 rounded">
+                      Opsional
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-stone-500 mt-1">
+                  Masukkan angka (satuan m² otomatis), atau isi simbol <strong>(-)</strong> / kosongkan kolom jika luas lahan tidak diketahui.
+                </p>
+              </div>
 
               {/* 4. Keterangan / Hasil Pelaksanaan (Fourth) */}
               <div>
