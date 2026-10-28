@@ -53,7 +53,10 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
   );
 
   return (
-    <header className="bg-stone-900 border-b border-emerald-500/20 text-white sticky top-0 z-50 no-print print:hidden">
+    <header 
+      className="bg-stone-900 border-b border-emerald-500/20 text-white sticky top-0 z-50 no-print print:hidden relative before:content-[''] before:absolute before:bottom-full before:left-0 before:right-0 before:h-[100vh] before:bg-stone-900 before:pointer-events-none"
+      style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}
+    >
       <div className="max-w-7xl mx-auto px-4 py-2 flex flex-col md:flex-row items-center justify-between gap-2.5">
         
         {/* Bagian Logo Kiri & Badge Profil Kanan (Khusus Mobile: Berada di baris atas sejajar) */}

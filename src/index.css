@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
+html {
+  background-color: #1c1917;
+  overscroll-behavior-y: none;
+}
+
 @layer base {
   body {
     font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-    background-color: #021a12;
+    background-color: #1c1917;
     color: #f8fafc;
     min-height: 100vh;
   }
