@@ -18,6 +18,12 @@ export const MinistryLogo: React.FC<MinistryLogoProps> = ({ className = '', size
         height={size}
         className="w-full h-full object-contain"
         loading="eager"
+        onError={(e) => {
+          const target = e.currentTarget;
+          if (!target.src.includes('logo_kementan.png')) {
+            target.src = '/logo_kementan.png';
+          }
+        }}
       />
     </div>
   );

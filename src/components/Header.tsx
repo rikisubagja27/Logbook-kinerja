@@ -1,7 +1,8 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { UserProfile } from '../types/logbook';
-import { cleanNipDigits, getEpersonalUrlWithNip } from '../utils/storage';
+import { cleanNipDigits } from '../utils/storage';
 import { PWAInstallButton } from './PWAInstallButton';
+import { User } from 'lucide-react';
 
 interface HeaderProps {
   activeTab: 'form' | 'list' | 'report' | 'epersonal' | 'profile';
@@ -13,13 +14,50 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
   // Mengambil NIP & nama dari profil aktif
   const currentNip = cleanNipDigits(profile?.nip);
   const currentName = profile?.nama || 'Pegawai';
+  const profilePhoto = profile?.fotoProfil;
+
+  // Komponen Badge Profil di Pojok Kanan Atas: Frame Kotak Foto, di bawahnya Icon Hijau Aktif & Nama
+  const UserProfileBadge = () => (
+    <button
+      type="button"
+      onClick={() => setActiveTab('profile')}
+      className="flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-xl bg-stone-800/80 hover:bg-stone-700/80 border border-emerald-500/30 hover:border-emerald-400 text-center transition-all cursor-pointer group shadow-xs active:scale-95"
+      title={`Profil Pegawai: ${currentName} (Klik untuk membuka profil / ganti foto)`}
+    >
+      {/* Frame Kotak Foto Profil Pengguna (Menggantikan tulisan AKTIF) */}
+      <div className="w-10 h-10 sm:w-11 sm:h-11 aspect-square rounded-lg border-2 border-emerald-400/80 overflow-hidden bg-stone-950 flex items-center justify-center shadow-inner shrink-0 group-hover:border-emerald-300 transition-colors">
+        {profilePhoto ? (
+          <img
+            src={profilePhoto}
+            alt={currentName}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="w-full h-full flex flex-col items-center justify-center bg-stone-800 text-emerald-400/90 group-hover:text-emerald-300">
+            <User className="w-5 h-5" />
+          </div>
+        )}
+      </div>
+
+      {/* Di bawah foto: Icon hijau yang menandakan aktif dan Nama Pegawai */}
+      <div className="flex items-center justify-center gap-1.5 mt-1 max-w-[105px] sm:max-w-[130px]">
+        <span className="relative flex h-2 w-2 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-400"></span>
+        </span>
+        <span className="text-[10px] sm:text-[11px] font-bold text-white truncate group-hover:text-emerald-300 uppercase leading-tight">
+          {currentName}
+        </span>
+      </div>
+    </button>
+  );
 
   return (
     <header className="bg-stone-900 border-b border-emerald-500/20 text-white sticky top-0 z-50 no-print print:hidden">
-      <div className="max-w-7xl mx-auto px-4 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
+      <div className="max-w-7xl mx-auto px-4 py-2 flex flex-col md:flex-row items-center justify-between gap-2.5">
         
-        {/* Bagian Logo, Judul & Status Akun Aktif */}
-        <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
+        {/* Bagian Logo Kiri & Badge Profil Kanan (Khusus Mobile: Berada di baris atas sejajar) */}
+        <div className="flex items-center justify-between w-full md:w-auto gap-3">
           <div className="flex items-center gap-2.5">
             <img 
               src="/app_logo.png" 
@@ -32,21 +70,10 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
             </div>
           </div>
 
-          {/* Quick Active Officer Badge -> Links to e-Personal tab */}
-          <button
-            type="button"
-            onClick={() => setActiveTab('epersonal')}
-            className="flex items-center gap-2 px-2.5 py-1 rounded-xl bg-stone-800/90 hover:bg-stone-700/80 border border-emerald-500/30 text-left transition-all cursor-pointer group shadow-xs"
-            title="Klik untuk membuka menu e-Personal & ganti data NIP karyawan"
-          >
-            <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse shrink-0"></span>
-            <div className="min-w-0">
-              <span className="text-[10px] text-stone-400 block uppercase leading-none">Aktif:</span>
-              <span className="text-xs font-bold text-white block truncate max-w-[120px] sm:max-w-[150px] group-hover:text-emerald-300">
-                {currentName}
-              </span>
-            </div>
-          </button>
+          {/* Profil di Pojok Kanan Atas untuk Layar Mobile */}
+          <div className="md:hidden">
+            <UserProfileBadge />
+          </div>
         </div>
 
         {/* Bagian Menu Navigasi (Isi, Rekap, Laporan, e-Personal, Profil) */}
@@ -119,6 +146,11 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
           {/* Tombol Pasang Aplikasi Native / PWA */}
           <PWAInstallButton variant="compact" />
 
+        </div>
+
+        {/* Profil di Pojok Kanan Atas untuk Layar Desktop (md ke atas) */}
+        <div className="hidden md:flex items-center">
+          <UserProfileBadge />
         </div>
 
       </div>

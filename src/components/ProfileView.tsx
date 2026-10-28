@@ -112,12 +112,33 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       setErrorMessage(null);
       // Auto resize photo to avatar friendly size
       const result = await resizeImageFile(file, 600, 0.85);
-      setFormData((prev) => ({ ...prev, fotoProfil: result.dataUrl }));
+      const updatedProfile = { ...formData, fotoProfil: result.dataUrl };
+      setFormData(updatedProfile);
+      // Simpan otomatis agar langsung muncul di pojok kanan atas secara real-time
+      onSaveProfile(updatedProfile);
+      if (updatedProfile.nip && cleanNipDigits(updatedProfile.nip).length >= 4) {
+        saveProfileToNipDirectory(updatedProfile);
+      }
+      setToastMessage('Foto profil berhasil diunggah & otomatis terpasang!');
+      setShowSavedToast(true);
+      setTimeout(() => setShowSavedToast(false), 3000);
     } catch (err: any) {
       setErrorMessage('Gagal memproses foto: ' + err.message);
     } finally {
       setIsProcessingPhoto(false);
     }
+  };
+
+  const handleRemovePhoto = () => {
+    const updatedProfile = { ...formData, fotoProfil: undefined };
+    setFormData(updatedProfile);
+    onSaveProfile(updatedProfile);
+    if (updatedProfile.nip && cleanNipDigits(updatedProfile.nip).length >= 4) {
+      saveProfileToNipDirectory(updatedProfile);
+    }
+    setToastMessage('Foto profil berhasil dihapus.');
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3000);
   };
 
   const handleSignatureUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -698,14 +719,26 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={triggerPhotoUpload}
-              className="text-xs px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 font-medium text-stone-700 cursor-pointer flex items-center gap-1.5 transition-colors"
-            >
-              <Upload className="w-3.5 h-3.5 text-stone-500" />
-              <span>{isProcessingPhoto ? 'Memproses...' : 'Unggah Foto'}</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={triggerPhotoUpload}
+                className="text-xs px-3 py-1.5 rounded-lg border border-stone-300 hover:bg-stone-50 font-medium text-stone-700 cursor-pointer flex items-center gap-1.5 transition-colors"
+              >
+                <Upload className="w-3.5 h-3.5 text-stone-500" />
+                <span>{isProcessingPhoto ? 'Memproses...' : formData.fotoProfil ? 'Ganti Foto' : 'Unggah Foto'}</span>
+              </button>
+              {formData.fotoProfil && (
+                <button
+                  type="button"
+                  onClick={handleRemovePhoto}
+                  className="text-xs p-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
+                  title="Hapus foto profil"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Core Info */}
