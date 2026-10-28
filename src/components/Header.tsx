@@ -58,11 +58,12 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
         
         {/* Bagian Logo Kiri & Badge Profil Kanan (Khusus Mobile: Berada di baris atas sejajar) */}
         <div className="flex items-center justify-between w-full md:w-auto gap-3">
-          <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-3">
             <img 
               src="/app_logo.png" 
               alt="Logo Logbook Kinerja" 
-              className="w-10 h-10 object-contain rounded-xl border border-emerald-500/40 bg-[#022c1e] p-0.5 shadow-md"
+              className="w-11 h-11 sm:w-12 sm:h-12 object-cover rounded-xl border border-emerald-400/60 shadow-lg shrink-0"
+              loading="eager"
             />
             <div>
               <h1 className="font-bold text-emerald-400 text-sm sm:text-base leading-tight">Logbook Kinerja Kps 1 Manoko</h1>
