@@ -12,7 +12,7 @@ export const MinistryLogo: React.FC<MinistryLogoProps> = ({ className = '', size
       style={{ width: size, height: size }}
     >
       <img
-        src="/logo_kementan.png"
+        src="/logo-kementan.png"
         alt="Logo Kementerian Pertanian Republik Indonesia"
         width={size}
         height={size}
