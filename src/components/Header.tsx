@@ -22,9 +22,9 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
         <div className="flex items-center gap-3 w-full md:w-auto justify-between md:justify-start">
           <div className="flex items-center gap-2.5">
             <img 
-              src="/logo.png" 
+              src="/app_logo.png" 
               alt="Logo Logbook Kinerja" 
-              className="w-10 h-10 object-contain rounded-lg border border-emerald-500/30 bg-emerald-950 p-1"
+              className="w-10 h-10 object-contain rounded-xl border border-emerald-500/40 bg-[#022c1e] p-0.5 shadow-md"
             />
             <div>
               <h1 className="font-bold text-emerald-400 text-sm sm:text-base leading-tight">Logbook Kinerja Kps 1 Manoko</h1>

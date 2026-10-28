@@ -13,6 +13,7 @@ import {
   CustomReportData 
 } from '../utils/docxExport';
 import { resizeImageFile } from '../utils/imageUtils';
+import { downloadOrShareBlob } from '../utils/downloadUtils';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { 
@@ -660,7 +661,8 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       const cleanTitle = periodTitle.replace(/\s+/g, '_');
       const filename = `Laporan_Kinerja_${cleanName}_${cleanTitle}.pdf`;
 
-      pdf.save(filename);
+      const pdfBlob = pdf.output('blob');
+      await downloadOrShareBlob(pdfBlob, filename, `Laporan Kinerja - ${periodTitle}`);
       setPdfProgress('');
     } catch (err: any) {
       console.error('PDF export error:', err);
@@ -955,9 +957,6 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               justifyContent: 'space-between',
               alignItems: 'center',
               textAlign: 'center',
-              minHeight: '1123px',
-              height: '1123px',
-              maxHeight: '1123px',
               boxSizing: 'border-box',
               padding: '48px 40px',
               backgroundColor: '#ffffff'

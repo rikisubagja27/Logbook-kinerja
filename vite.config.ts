@@ -11,7 +11,16 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['apple-touch-icon.png', 'logo.png', 'logo_kementan.svg'],
+        includeAssets: [
+          'apple-touch-icon.png',
+          'app_logo.png',
+          'logo.png',
+          'logo_kementan.png',
+          'logo_kementan.svg',
+          'pwa-192x192.png',
+          'pwa-512x512.png',
+          'pwa-maskable-512x512.png'
+        ],
         manifest: {
           id: '/',
           name: 'Logbook Kinerja Kps 1 manoko',
@@ -47,6 +56,8 @@ export default defineConfig(() => {
         },
         workbox: {
           globPatterns: ['**/*.{js,css,html,ico,png,svg,woff,woff2}'],
+          globIgnores: ['assets/aistudio/**/*', '**/*.pdf'],
+          maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
           runtimeCaching: [
             {
               urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,

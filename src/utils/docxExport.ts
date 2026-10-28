@@ -13,6 +13,7 @@ import {
   convertInchesToTwip,
 } from 'docx';
 import { saveAs } from 'file-saver';
+import { downloadOrShareBlob } from './downloadUtils';
 import { LogbookEntry, UserProfile, ReportConfig } from '../types/logbook';
 import { base64ToUint8Array } from './imageUtils';
 import { formatAreaUnit } from './storage';
@@ -379,7 +380,7 @@ export async function exportReportToDocx(
   // Pre-load official Kementan logo
   let coverLogoRun: ImageRun | null = null;
   try {
-    const logoData = await rasterizeImageToUint8Array('/logo_kementan.svg');
+    const logoData = await rasterizeImageToUint8Array('/logo_kementan.png');
     if (logoData) {
       coverLogoRun = new ImageRun({
         type: 'png',
@@ -729,5 +730,5 @@ export async function exportReportToDocx(
 
   const blob = await Packer.toBlob(doc);
   const fileName = `Laporan_Kinerja_${profile.nama.replace(/\s+/g, '_')}_${periodTitle.replace(/\s+/g, '_')}.docx`;
-  saveAs(blob, fileName);
+  await downloadOrShareBlob(blob, fileName, `Laporan Kinerja - ${periodTitle} (.docx)`);
 }
