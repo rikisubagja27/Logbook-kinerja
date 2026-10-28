@@ -16,16 +16,16 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
   const currentName = profile?.nama || 'Pegawai';
   const profilePhoto = profile?.fotoProfil;
 
-  // Komponen Badge Profil di Pojok Kanan Atas: Frame Kotak Foto, di bawahnya Icon Hijau Aktif & Nama
+  // Komponen Profil di Pojok Kanan Atas: Foto tanpa frame luar pembungkus, di bawahnya Icon Hijau Aktif & Nama
   const UserProfileBadge = () => (
     <button
       type="button"
       onClick={() => setActiveTab('profile')}
-      className="flex flex-col items-center justify-center p-1 sm:p-1.5 rounded-xl bg-stone-800/80 hover:bg-stone-700/80 border border-emerald-500/30 hover:border-emerald-400 text-center transition-all cursor-pointer group shadow-xs active:scale-95"
+      className="flex flex-col items-center justify-center text-center cursor-pointer group active:scale-95 transition-transform focus:outline-none"
       title={`Profil Pegawai: ${currentName} (Klik untuk membuka profil / ganti foto)`}
     >
-      {/* Frame Kotak Foto Profil Pengguna (Menggantikan tulisan AKTIF) */}
-      <div className="w-10 h-10 sm:w-11 sm:h-11 aspect-square rounded-lg border-2 border-emerald-400/80 overflow-hidden bg-stone-950 flex items-center justify-center shadow-inner shrink-0 group-hover:border-emerald-300 transition-colors">
+      {/* Foto Profil Pengguna */}
+      <div className="w-10 h-10 sm:w-11 sm:h-11 aspect-square rounded-xl border border-emerald-400/60 overflow-hidden bg-stone-800 flex items-center justify-center shadow-md shrink-0 group-hover:border-emerald-300 transition-colors">
         {profilePhoto ? (
           <img
             src={profilePhoto}
