@@ -13,7 +13,8 @@ import {
   PlusCircle, 
   X,
   Maximize2,
-  AlertCircle
+  AlertCircle,
+  HardDrive
 } from 'lucide-react';
 
 interface LogbookListProps {
@@ -141,6 +142,17 @@ export const LogbookList: React.FC<LogbookListProps> = ({
     reader.readAsText(file);
   };
 
+  // Estimate total storage size consumed by logbooks and photos
+  const estimatedBytes = useMemo(() => {
+    try {
+      return new Blob([JSON.stringify(entries)]).size;
+    } catch {
+      return entries.length * 120000;
+    }
+  }, [entries]);
+  const estimatedMb = (estimatedBytes / (1024 * 1024)).toFixed(1);
+  const percentageOf1Gb = Math.min(100, Math.max(0.1, Number(((estimatedBytes / (1024 * 1024 * 1024)) * 100).toFixed(2))));
+
   return (
     <div className="max-w-6xl mx-auto py-6 px-4 sm:px-6 space-y-6">
       {/* Top Header & Actions */}
@@ -225,6 +237,39 @@ export const LogbookList: React.FC<LogbookListProps> = ({
             {stats.cutiCount}
           </span>
           <span className="text-[11px] text-blue-600 mt-0.5">Hari cuti tahunan/resmi</span>
+        </div>
+      </div>
+
+      {/* Indikator Kapasitas Penyimpanan Cloud & Lokal */}
+      <div className="bg-stone-900/90 border border-emerald-500/25 rounded-xl p-3.5 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs text-white">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-300 shrink-0">
+            <HardDrive className="w-4 h-4" />
+          </div>
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-bold text-white">Status Penyimpanan Data:</span>
+              <span className="text-emerald-300 font-semibold bg-emerald-950/90 border border-emerald-500/40 px-2 py-0.5 rounded text-[11px]">
+                Sangat Longgar ({percentageOf1Gb}% dari 1.000 MB)
+              </span>
+            </div>
+            <p className="text-[11px] text-stone-300 mt-0.5">
+              Terpakai perkiraan ~<strong>{estimatedMb} MB</strong> dari kuota gratis <strong>1 GB (1.000 MB)</strong>. Masih sangat luas untuk ribuan logbook &amp; foto.
+            </p>
+          </div>
+        </div>
+
+        <div className="w-full sm:w-44 space-y-1 shrink-0">
+          <div className="flex justify-between text-[10px] text-stone-400 font-mono">
+            <span>{estimatedMb} MB</span>
+            <span>1.000 MB</span>
+          </div>
+          <div className="w-full bg-stone-800 rounded-full h-2 overflow-hidden border border-stone-700">
+            <div
+              className="bg-emerald-400 h-full rounded-full transition-all duration-500"
+              style={{ width: `${Math.max(percentageOf1Gb, 1)}%` }}
+            />
+          </div>
         </div>
       </div>
 

@@ -9,6 +9,8 @@ import {
   cleanNipDigits,
   DEFAULT_USER_PROFILE
 } from '../utils/storage';
+import { loginWithGoogle, logoutUser, auth } from '../firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 import { 
   User, 
   Upload, 
@@ -102,6 +104,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   useEffect(() => {
     setFormData(profile);
   }, [profile]);
+
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser) {
+        const acc: GoogleAccount = {
+          uid: fbUser.uid,
+          displayName: fbUser.displayName || fbUser.email?.split('@')[0] || 'Pegawai',
+          email: fbUser.email || '',
+          photoURL: fbUser.photoURL || undefined,
+          provider: 'google.com',
+          lastLogin: new Date().toISOString(),
+        };
+        setGoogleAccount(acc);
+      } else {
+        setGoogleAccount(loadGoogleAccount());
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -255,6 +276,23 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   // --- GOOGLE SIGN-IN HANDLERS ---
+  const handleDirectGoogleLogin = async () => {
+    try {
+      setErrorMessage(null);
+      const fbUser = await loginWithGoogle();
+      if (fbUser) {
+        setToastMessage(`Login berhasil sebagai: ${fbUser.displayName || fbUser.email}`);
+        setShowSavedToast(true);
+        setIsLoginModalOpen(false);
+        setTimeout(() => setShowSavedToast(false), 3500);
+      }
+    } catch (err: any) {
+      console.warn('Direct Google sign in error:', err);
+      // If popup was blocked or failed, open manual dialog
+      setIsLoginModalOpen(true);
+    }
+  };
+
   const handleExecuteGoogleLogin = (name: string, email: string) => {
     const cleanName = name.trim();
     const cleanEmail = email.trim().toLowerCase();
@@ -337,7 +375,12 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
   };
 
   // Sign out from Google session
-  const handleGoogleLogout = () => {
+  const handleGoogleLogout = async () => {
+    try {
+      await logoutUser();
+    } catch (err) {
+      console.warn('Firebase logout notice:', err);
+    }
     clearGoogleAccount();
     setGoogleAccount(null);
     setToastMessage('Berhasil keluar dari Akun Google.');
@@ -516,6 +559,14 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                 </button>
               </div>
             </div>
+
+            {/* Multi-Device Cloud Sync Status Note */}
+            <div className="bg-emerald-950/70 border border-emerald-500/30 rounded-xl p-3 text-xs text-stone-300 flex items-start gap-2.5 mt-3">
+              <span className="text-emerald-400 text-base shrink-0">☁️</span>
+              <div className="leading-relaxed">
+                <strong className="text-emerald-300">Sinkronisasi Multi-Perangkat Aktif:</strong> Seluruh riwayat logbook dan profil Anda otomatis tersimpan di Cloud Firebase. Buka aplikasi ini di ponsel (HP), laptop, atau komputer lain dan login dengan email <strong>{googleAccount.email}</strong> untuk membuka data yang sama secara langsung.
+              </div>
+            </div>
           </div>
         ) : (
           /* Not Logged In State (Prompts New Users to Sign In with Google) */
@@ -526,25 +577,25 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
                   <GoogleLogo className="w-5 h-5" />
                 </div>
                 <h2 className="text-base font-bold text-white tracking-tight">
-                  Login Pengguna Baru dengan Akun Google
+                  Sinkronisasi Akun Google (Cloud Firebase)
                 </h2>
                 <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full">
-                  Pengguna Baru
+                  Multi-Perangkat
                 </span>
               </div>
               <p className="text-xs text-stone-300 leading-relaxed">
-                Bagi pegawai baru atau pengguna yang baru bertugas di KPS PVT 1 Manoko, Anda dapat langsung masuk dengan Akun Google untuk sinkronisasi identitas otomatis dan mengisi profil dinas Anda dengan mudah.
+                Masuk dengan Akun Google agar data logbook dan profil tersimpan di cloud. Saat membuka aplikasi di HP, laptop, atau tablet lain dengan akun yang sama, seluruh catatan Anda akan otomatis ada dan terjaga.
               </p>
             </div>
 
-            <div className="shrink-0">
+            <div className="shrink-0 flex items-center gap-2">
               <button
                 type="button"
-                onClick={() => setIsLoginModalOpen(true)}
+                onClick={handleDirectGoogleLogin}
                 className="w-full sm:w-auto flex items-center justify-center gap-2.5 px-5 py-3 rounded-xl bg-white hover:bg-stone-100 text-stone-900 font-bold text-xs sm:text-sm shadow-xl hover:shadow-2xl transition-all border border-stone-200 cursor-pointer active:scale-95"
               >
                 <GoogleLogo className="w-4 h-4" />
-                <span>Masuk dengan Akun Google</span>
+                <span>Masuk dengan Google</span>
               </button>
             </div>
           </div>
@@ -592,8 +643,17 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
 
               {/* Quick 1-Tap Option: Current officer preset account */}
               <div className="space-y-2">
-                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
-                  Pilih Akun yang Tersedia
+                <button
+                  type="button"
+                  onClick={handleDirectGoogleLogin}
+                  className="w-full py-2.5 px-4 rounded-xl bg-white border border-stone-300 hover:bg-stone-50 text-stone-800 font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer"
+                >
+                  <GoogleLogo className="w-4 h-4" />
+                  <span>Buka Dialog Popup Akun Google Resmi</span>
+                </button>
+
+                <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider block pt-1">
+                  Atau Pilih Profil Riki Subagja
                 </span>
                 <button
                   type="button"

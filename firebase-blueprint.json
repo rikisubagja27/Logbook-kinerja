@@ -1,0 +1,58 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile settings and credentials for the civil servant / employee",
+      "type": "object",
+      "properties": {
+        "nama": { "type": "string" },
+        "nip": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "statusKepegawaian": { "type": "string" },
+        "unitKerja": { "type": "string" },
+        "instansiInduk": { "type": "string" },
+        "kementerian": { "type": "string" },
+        "tempatPenetapan": { "type": "string" },
+        "email": { "type": "string" },
+        "fotoProfil": { "type": "string" },
+        "tandaTanganUrl": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["nama", "nip", "email"]
+    },
+    "LogbookEntry": {
+      "title": "LogbookEntry",
+      "description": "Daily operational performance logbook entry with documentation",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "tanggal": { "type": "string" },
+        "kehadiran": { "type": "string", "enum": ["WFO", "Sakit", "Cuti"] },
+        "waktuMulai": { "type": "string" },
+        "waktuSelesai": { "type": "string" },
+        "kategori": { "type": "string" },
+        "uraianPekerjaan": { "type": "string" },
+        "lokasiPekerjaan": { "type": "string" },
+        "luasLahan": { "type": "string" },
+        "fotoSebelum": { "type": "string" },
+        "fotoSesudah": { "type": "string" },
+        "suratSakit": { "type": "string" },
+        "keterangan": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["id", "tanggal", "kehadiran", "uraianPekerjaan"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}/profile/main": {
+      "schema": "UserProfile",
+      "description": "Profile document of the authenticated user"
+    },
+    "/users/{userId}/logbookEntries/{entryId}": {
+      "schema": "LogbookEntry",
+      "description": "Logbook entries created and managed by the authenticated user"
+    }
+  }
+}
