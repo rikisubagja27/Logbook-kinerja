@@ -222,29 +222,42 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     }
   }, [entries]);
 
-  // Filter entries for this report period
+  // Filter entries for this report period and strictly sort chronologically from earliest to latest date (1 -> 31)
   const filteredEntries = useMemo(() => {
-    return entries.filter((e) => {
-      const d = new Date(e.tanggal);
-      const entryYear = d.getFullYear();
-      const entryMonth = d.getMonth() + 1;
+    return entries
+      .filter((e) => {
+        const d = new Date(e.tanggal);
+        const entryYear = d.getFullYear();
+        const entryMonth = d.getMonth() + 1;
 
-      if (entryYear !== reportConfig.tahun) return false;
+        if (entryYear !== reportConfig.tahun) return false;
 
-      if (reportConfig.tipe === 'bulanan') {
-        return entryMonth === reportConfig.bulan;
-      }
-      if (reportConfig.tipe === 'triwulan') {
-        const quarterMonths = ({
-          1: [1, 2, 3],
-          2: [4, 5, 6],
-          3: [7, 8, 9],
-          4: [10, 11, 12],
-        } as Record<number, number[]>)[reportConfig.triwulan] || [];
-        return quarterMonths.includes(entryMonth);
-      }
-      return true; // Tahunan
-    });
+        if (reportConfig.tipe === 'bulanan') {
+          return entryMonth === reportConfig.bulan;
+        }
+        if (reportConfig.tipe === 'triwulan') {
+          const quarterMonths = ({
+            1: [1, 2, 3],
+            2: [4, 5, 6],
+            3: [7, 8, 9],
+            4: [10, 11, 12],
+          } as Record<number, number[]>)[reportConfig.triwulan] || [];
+          return quarterMonths.includes(entryMonth);
+        }
+        return true; // Tahunan
+      })
+      .sort((a, b) => {
+        // 1. Urutkan tanggal dari awal sampai akhir (1 -> 31)
+        const dateDiff = a.tanggal.localeCompare(b.tanggal);
+        if (dateDiff !== 0) return dateDiff;
+        // 2. Jika tanggal sama, urutkan jam mulai (pagi ke sore)
+        const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
+        const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
+        const timeDiff = timeA.localeCompare(timeB);
+        if (timeDiff !== 0) return timeDiff;
+        // 3. Fallback createdAt
+        return (a.createdAt || '').localeCompare(b.createdAt || '');
+      });
   }, [entries, reportConfig]);
 
   const periodTitle = getReportPeriodTitle(reportConfig);

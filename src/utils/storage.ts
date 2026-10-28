@@ -314,24 +314,48 @@ export const INITIAL_LOGBOOK_ENTRIES: LogbookEntry[] = [
   },
 ];
 
+/**
+ * Urutkan catatan logbook secara kronologis dari tanggal awal sampai tanggal akhir (Ascending: 1 -> 31)
+ * Jika berada pada tanggal yang sama, urutkan berdasarkan waktuMulai (pagi ke sore)
+ */
+export function sortLogbookEntriesByDateAscending(entries: LogbookEntry[]): LogbookEntry[] {
+  return [...entries].sort((a, b) => {
+    // 1. Urutkan tanggal awal sampai tanggal akhir (ascending)
+    const dateDiff = a.tanggal.localeCompare(b.tanggal);
+    if (dateDiff !== 0) return dateDiff;
+
+    // 2. Jika tanggal sama, urutkan berdasarkan jam mulai (pagi ke sore)
+    const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
+    const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
+    const timeDiff = timeA.localeCompare(timeB);
+    if (timeDiff !== 0) return timeDiff;
+
+    // 3. Fallback createdAt
+    return (a.createdAt || '').localeCompare(b.createdAt || '');
+  });
+}
+
 export function loadLogbookEntries(): LogbookEntry[] {
   try {
     const raw = localStorage.getItem(LOGBOOK_STORAGE_KEY);
     if (!raw) {
-      saveLogbookEntries(INITIAL_LOGBOOK_ENTRIES);
-      return INITIAL_LOGBOOK_ENTRIES;
+      const sorted = sortLogbookEntriesByDateAscending(INITIAL_LOGBOOK_ENTRIES);
+      saveLogbookEntries(sorted);
+      return sorted;
     }
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : INITIAL_LOGBOOK_ENTRIES;
+    const list = Array.isArray(parsed) ? parsed : INITIAL_LOGBOOK_ENTRIES;
+    return sortLogbookEntriesByDateAscending(list);
   } catch (err) {
     console.error('Error loading logbook entries:', err);
-    return INITIAL_LOGBOOK_ENTRIES;
+    return sortLogbookEntriesByDateAscending(INITIAL_LOGBOOK_ENTRIES);
   }
 }
 
 export function saveLogbookEntries(entries: LogbookEntry[]): void {
   try {
-    localStorage.setItem(LOGBOOK_STORAGE_KEY, JSON.stringify(entries));
+    const sorted = sortLogbookEntriesByDateAscending(entries);
+    localStorage.setItem(LOGBOOK_STORAGE_KEY, JSON.stringify(sorted));
   } catch (err) {
     console.error('Error saving logbook entries:', err);
   }

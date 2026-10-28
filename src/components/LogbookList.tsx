@@ -34,10 +34,11 @@ export const LogbookList: React.FC<LogbookListProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterAttendance, setFilterAttendance] = useState<string>('all');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // Default: Tanggal awal sampai akhir (1 -> 31)
   const [previewPhotoEntry, setPreviewPhotoEntry] = useState<LogbookEntry | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<LogbookEntry | null>(null);
 
-  // Filtered entries
+  // Filtered and chronologically sorted entries
   const filteredEntries = useMemo(() => {
     return entries
       .filter((entry) => {
@@ -63,8 +64,20 @@ export const LogbookList: React.FC<LogbookListProps> = ({
 
         return true;
       })
-      .sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
-  }, [entries, searchTerm, filterMonth, filterAttendance]);
+      .sort((a, b) => {
+        const factor = sortOrder === 'asc' ? 1 : -1;
+        // 1. Urutkan tanggal
+        const dateDiff = a.tanggal.localeCompare(b.tanggal);
+        if (dateDiff !== 0) return factor * dateDiff;
+        // 2. Jika tanggal sama, urutkan jam mulai (pagi ke sore)
+        const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
+        const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
+        const timeDiff = timeA.localeCompare(timeB);
+        if (timeDiff !== 0) return factor * timeDiff;
+        // 3. Fallback createdAt
+        return factor * (a.createdAt || '').localeCompare(b.createdAt || '');
+      });
+  }, [entries, searchTerm, filterMonth, filterAttendance, sortOrder]);
 
   // Available months from entries
   const availableMonths = useMemo(() => {
@@ -228,7 +241,18 @@ export const LogbookList: React.FC<LogbookListProps> = ({
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Urutan Tanggal Selector */}
+          <select
+            value={sortOrder}
+            onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
+            className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-stone-800"
+            title="Urutan Kronologis Tanggal Logbook"
+          >
+            <option value="asc">📅 Tanggal: Awal ke Akhir (1→31)</option>
+            <option value="desc">📅 Tanggal: Akhir ke Awal (31→1)</option>
+          </select>
+
           {/* Month filter */}
           <select
             value={filterMonth}

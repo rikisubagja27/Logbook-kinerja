@@ -7,7 +7,8 @@ import {
   loadLogbookEntries, 
   saveLogbookEntries, 
   loadUserProfile, 
-  saveUserProfile 
+  saveUserProfile,
+  sortLogbookEntriesByDateAscending
 } from './utils/storage';
 import { Header } from './components/Header';
 import { LogbookForm } from './components/LogbookForm';
@@ -24,7 +25,7 @@ export default function App() {
   const [profile, setProfile] = useState<UserProfile>(() => loadUserProfile());
   const [editingEntry, setEditingEntry] = useState<LogbookEntry | null>(null);
 
-  // Sync entries to localStorage
+  // Sync entries to localStorage and always keep sorted chronologically from earliest to latest date
   const handleSaveEntry = (newOrUpdatedEntry: LogbookEntry) => {
     setEntries((prev) => {
       const exists = prev.some((e) => e.id === newOrUpdatedEntry.id);
@@ -32,10 +33,11 @@ export default function App() {
       if (exists) {
         updated = prev.map((e) => (e.id === newOrUpdatedEntry.id ? newOrUpdatedEntry : e));
       } else {
-        updated = [newOrUpdatedEntry, ...prev];
+        updated = [...prev, newOrUpdatedEntry];
       }
-      saveLogbookEntries(updated);
-      return updated;
+      const sorted = sortLogbookEntriesByDateAscending(updated);
+      saveLogbookEntries(sorted);
+      return sorted;
     });
     setEditingEntry(null);
   };
@@ -58,8 +60,9 @@ export default function App() {
   };
 
   const handleImportBackup = (imported: LogbookEntry[]) => {
-    setEntries(imported);
-    saveLogbookEntries(imported);
+    const sorted = sortLogbookEntriesByDateAscending(imported);
+    setEntries(sorted);
+    saveLogbookEntries(sorted);
   };
 
   const handleSaveProfile = (updatedProfile: UserProfile) => {

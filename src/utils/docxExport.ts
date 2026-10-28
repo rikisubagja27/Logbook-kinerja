@@ -121,28 +121,40 @@ export async function exportReportToDocx(
   const periodTitle = getReportPeriodTitle(config);
   const periodText = getReportPeriodText(config);
 
-  // Filter entries according to config
-  const filtered = entries.filter((e) => {
-    const d = new Date(e.tanggal);
-    const entryYear = d.getFullYear();
-    const entryMonth = d.getMonth() + 1;
+  // Filter entries according to config and sort chronologically from earliest to latest date (1 -> 31)
+  const filtered = entries
+    .filter((e) => {
+      const d = new Date(e.tanggal);
+      const entryYear = d.getFullYear();
+      const entryMonth = d.getMonth() + 1;
 
-    if (entryYear !== config.tahun) return false;
+      if (entryYear !== config.tahun) return false;
 
-    if (config.tipe === 'bulanan') {
-      return entryMonth === config.bulan;
-    }
-    if (config.tipe === 'triwulan') {
-      const quarterMonths = {
-        1: [1, 2, 3],
-        2: [4, 5, 6],
-        3: [7, 8, 9],
-        4: [10, 11, 12],
-      }[config.triwulan] || [];
-      return quarterMonths.includes(entryMonth);
-    }
-    return true; // Tahunan includes whole year
-  });
+      if (config.tipe === 'bulanan') {
+        return entryMonth === config.bulan;
+      }
+      if (config.tipe === 'triwulan') {
+        const quarterMonths = {
+          1: [1, 2, 3],
+          2: [4, 5, 6],
+          3: [7, 8, 9],
+          4: [10, 11, 12],
+        }[config.triwulan] || [];
+        return quarterMonths.includes(entryMonth);
+      }
+      return true; // Tahunan includes whole year
+    })
+    .sort((a, b) => {
+      // 1. Tanggal awal sampai akhir
+      const dateDiff = a.tanggal.localeCompare(b.tanggal);
+      if (dateDiff !== 0) return dateDiff;
+      // 2. Jam mulai
+      const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
+      const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
+      const timeDiff = timeA.localeCompare(timeB);
+      if (timeDiff !== 0) return timeDiff;
+      return (a.createdAt || '').localeCompare(b.createdAt || '');
+    });
 
   // Grouping for Tabel 1
   type GroupedActivity = {
