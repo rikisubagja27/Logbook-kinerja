@@ -30,10 +30,10 @@ import { EPersonalView } from './components/EPersonalView';
 import { ProfileView } from './components/ProfileView';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
-import { CloudSyncBanner } from './components/CloudSyncBanner';
+import { CloudSyncView } from './components/CloudSyncView';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'report' | 'epersonal' | 'profile'>('form');
+  const [activeTab, setActiveTab] = useState<'form' | 'list' | 'report' | 'cloudsync' | 'profile' | 'epersonal'>('form');
   const [entries, setEntries] = useState<LogbookEntry[]>(() => loadLogbookEntries());
   const [profile, setProfile] = useState<UserProfile>(() => loadUserProfile());
   const [editingEntry, setEditingEntry] = useState<LogbookEntry | null>(null);
@@ -215,14 +215,6 @@ export default function App() {
         profile={profile}
       />
 
-      {/* Cloud Sync Status Banner (Multi-Device Sync Support) */}
-      <CloudSyncBanner
-        currentUser={currentUser}
-        isSyncing={isSyncing}
-        entriesCount={entries.length}
-        onManualSync={currentUser ? handleManualSync : undefined}
-      />
-
       {/* Offline Status Alert */}
       <OfflineIndicator />
 
@@ -262,6 +254,17 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'cloudsync' && (
+          <CloudSyncView
+            currentUser={currentUser}
+            isSyncing={isSyncing}
+            entriesCount={entries.length}
+            onManualSync={currentUser ? handleManualSync : undefined}
+            onNavigateToProfile={() => setActiveTab('profile')}
+            onNavigateToEpersonal={() => setActiveTab('epersonal')}
+          />
+        )}
+
         {activeTab === 'epersonal' && (
           <EPersonalView
             currentProfile={profile}
@@ -275,6 +278,7 @@ export default function App() {
             profile={profile}
             onSaveProfile={handleSaveProfile}
             onNavigateToEpersonal={() => setActiveTab('epersonal')}
+            onNavigateToCloudSync={() => setActiveTab('cloudsync')}
           />
         )}
       </main>

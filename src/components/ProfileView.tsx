@@ -38,6 +38,7 @@ interface ProfileViewProps {
   profile: UserProfile;
   onSaveProfile: (updated: UserProfile) => void;
   onNavigateToEpersonal?: () => void;
+  onNavigateToCloudSync?: () => void;
 }
 
 const GoogleLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
@@ -64,7 +65,8 @@ const GoogleLogo = ({ className = "w-5 h-5" }: { className?: string }) => (
 export const ProfileView: React.FC<ProfileViewProps> = ({ 
   profile, 
   onSaveProfile,
-  onNavigateToEpersonal
+  onNavigateToEpersonal,
+  onNavigateToCloudSync
 }) => {
   const [formData, setFormData] = useState<UserProfile>(profile);
   const [isProcessingPhoto, setIsProcessingPhoto] = useState(false);
@@ -288,6 +290,10 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
       }
     } catch (err: any) {
       console.warn('Direct Google sign in error:', err);
+      if (err.code === 'auth/unauthorized-domain' || err.message?.includes('unauthorized-domain')) {
+        const host = typeof window !== 'undefined' ? window.location.hostname : 'logbook-kinerja.vercel.app';
+        setLoginModalError(`Domain "${host}" belum diotorisasi di Firebase Console. Tambahkan domain ini di Firebase Console > Authentication > Settings > Authorized domains. Atau pilih akun preset di bawah.`);
+      }
       // If popup was blocked or failed, open manual dialog
       setIsLoginModalOpen(true);
     }
@@ -561,11 +567,22 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
             </div>
 
             {/* Multi-Device Cloud Sync Status Note */}
-            <div className="bg-emerald-950/70 border border-emerald-500/30 rounded-xl p-3 text-xs text-stone-300 flex items-start gap-2.5 mt-3">
-              <span className="text-emerald-400 text-base shrink-0">☁️</span>
-              <div className="leading-relaxed">
-                <strong className="text-emerald-300">Sinkronisasi Multi-Perangkat Aktif:</strong> Seluruh riwayat logbook dan profil Anda otomatis tersimpan di Cloud Firebase. Buka aplikasi ini di ponsel (HP), laptop, atau komputer lain dan login dengan email <strong>{googleAccount.email}</strong> untuk membuka data yang sama secara langsung.
+            <div className="bg-emerald-950/70 border border-emerald-500/30 rounded-xl p-3 text-xs text-stone-300 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 mt-3">
+              <div className="flex items-start gap-2.5">
+                <span className="text-emerald-400 text-base shrink-0">☁️</span>
+                <div className="leading-relaxed">
+                  <strong className="text-emerald-300">Sinkronisasi Multi-Perangkat Aktif:</strong> Logbook dan profil tersimpan aman di Cloud Firebase untuk akun <strong>{googleAccount.email}</strong>.
+                </div>
               </div>
+              {onNavigateToCloudSync && (
+                <button
+                  type="button"
+                  onClick={onNavigateToCloudSync}
+                  className="px-3 py-1.5 bg-emerald-800 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs cursor-pointer shrink-0 transition-colors self-start sm:self-auto border border-emerald-600/50"
+                >
+                  Buka Menu Sinkron Cloud →
+                </button>
+              )}
             </div>
           </div>
         ) : (

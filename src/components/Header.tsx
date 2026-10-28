@@ -5,8 +5,8 @@ import { PWAInstallButton } from './PWAInstallButton';
 import { User } from 'lucide-react';
 
 interface HeaderProps {
-  activeTab: 'form' | 'list' | 'report' | 'epersonal' | 'profile';
-  setActiveTab: (tab: 'form' | 'list' | 'report' | 'epersonal' | 'profile') => void;
+  activeTab: 'form' | 'list' | 'report' | 'cloudsync' | 'profile' | 'epersonal';
+  setActiveTab: (tab: 'form' | 'list' | 'report' | 'cloudsync' | 'profile' | 'epersonal') => void;
   profile: UserProfile;
 }
 
@@ -116,24 +116,19 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
             <span>📄</span> Laporan
           </button>
 
-          {/* Menu Halaman e-Personal & Data NIP Pegawai */}
+          {/* Menu Sinkronisasi Cloud Antarperangkat (Menggantikan e-Personal di Navigasi Utama) */}
           <button
             type="button"
-            onClick={() => setActiveTab('epersonal')}
+            onClick={() => setActiveTab('cloudsync')}
             className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer font-semibold ${
-              activeTab === 'epersonal'
+              activeTab === 'cloudsync'
                 ? 'bg-emerald-600 text-white shadow'
                 : 'text-stone-300 hover:bg-stone-800 hover:text-white'
             }`}
-            title="Menu e-Personal & Pengelolaan Data NIP Karyawan"
+            title="Menu Sinkronisasi Cloud Antarperangkat & Status Akun"
           >
-            <span>🏢</span>
-            <span>e-Personal</span>
-            {currentNip && (
-              <span className="text-[10px] bg-emerald-950/80 text-emerald-300 border border-emerald-500/30 px-1 py-0.2 rounded font-mono hidden xl:inline">
-                {currentNip.slice(0, 8)}...
-              </span>
-            )}
+            <span>☁️</span>
+            <span>Sinkron Cloud</span>
           </button>
 
           <button
