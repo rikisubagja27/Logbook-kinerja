@@ -562,7 +562,14 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     clonedBodies.forEach((b) => {
       if (!b.matches('h1, h2, h3, h4, h5, th, .report-title')) {
         b.style.fontFamily = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
+        b.style.fontSize = '12pt';
+        b.style.lineHeight = '1.5';
       }
+    });
+
+    const tableCells = clonedDoc.querySelectorAll<HTMLElement>('table td, table th');
+    tableCells.forEach((c) => {
+      c.style.fontSize = '11pt';
     });
 
     // Hide all interactive UI / controls in cloned document
@@ -1309,9 +1316,9 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               <h3 className="text-lg font-bold uppercase tracking-wider">PENDAHULUAN</h3>
             </div>
 
-            <div className="space-y-6 text-sm text-stone-900">
+            <div className="space-y-6 text-[12pt] text-stone-900 leading-relaxed font-sans">
               <div>
-                <h4 className="font-bold text-sm text-stone-900 mb-3">1.1 LATAR BELAKANG</h4>
+                <h4 className="font-bold text-[12pt] text-stone-900 mb-3">1.1 LATAR BELAKANG</h4>
                 {isEditMode ? (
                   <textarea
                     rows={8}
@@ -1320,12 +1327,12 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                       setCustomLatarBelakang(e.target.value);
                       setHasCustomEdits(true);
                     }}
-                    className="w-full p-3 text-sm border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
+                    className="w-full p-3 text-[12pt] border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
                   />
                 ) : (
                   <div className="space-y-3">
                     {customLatarBelakang.split('\n\n').map((para, idx) => (
-                      <p key={idx} className="indent-8 leading-relaxed">
+                      <p key={idx} className="indent-8 leading-relaxed text-[12pt]">
                         {para}
                       </p>
                     ))}
@@ -1334,7 +1341,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               </div>
 
               <div className="pt-2">
-                <h4 className="font-bold text-sm text-stone-900 mb-3">1.2 TUJUAN</h4>
+                <h4 className="font-bold text-[12pt] text-stone-900 mb-3">1.2 TUJUAN</h4>
                 {isEditMode ? (
                   <textarea
                     rows={3}
@@ -1343,17 +1350,17 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                       setCustomTujuan(e.target.value);
                       setHasCustomEdits(true);
                     }}
-                    className="w-full p-3 text-sm border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
+                    className="w-full p-3 text-[12pt] border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
                   />
                 ) : (
-                  <p className="indent-8 leading-relaxed">
+                  <p className="indent-8 leading-relaxed text-[12pt]">
                     {customTujuan}
                   </p>
                 )}
               </div>
 
               <div className="pt-2">
-                <h4 className="font-bold text-sm text-stone-900 mb-3">1.3 WAKTU PELAKSANAAN</h4>
+                <h4 className="font-bold text-[12pt] text-stone-900 mb-3">1.3 WAKTU PELAKSANAAN</h4>
                 {isEditMode ? (
                   <input
                     type="text"
@@ -1362,10 +1369,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                       setCustomWaktuPelaksanaan(e.target.value);
                       setHasCustomEdits(true);
                     }}
-                    className="w-full p-3 text-sm border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
+                    className="w-full p-3 text-[12pt] border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
                   />
                 ) : (
-                  <p className="indent-8 leading-relaxed">
+                  <p className="indent-8 leading-relaxed text-[12pt]">
                     {customWaktuPelaksanaan}
                   </p>
                 )}
@@ -1391,18 +1398,18 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                   </div>
                 )}
 
-                <div className="space-y-4 text-sm text-stone-900">
+                <div className="space-y-4 text-[12pt] text-stone-900 leading-relaxed font-sans">
                   {pageIdx === 0 ? (
                     <div>
-                      <h4 className="font-bold text-sm text-stone-900">2.1 HASIL PELAKSANAAN</h4>
-                      <p className="mt-1 font-medium text-stone-900">Kegiatan {profile.jabatan}</p>
-                      <p className="mt-2 text-xs italic text-stone-600">
+                      <h4 className="font-bold text-[12pt] text-stone-900">2.1 HASIL PELAKSANAAN</h4>
+                      <p className="mt-1 font-medium text-[12pt] text-stone-900">Kegiatan {profile.jabatan}</p>
+                      <p className="mt-2 text-[11pt] italic text-stone-600">
                         Tabel 1. Rincian kegiatan {profile.jabatan.toLowerCase()} {periodText}
                       </p>
                     </div>
                   ) : (
                     <div className="mb-2">
-                      <p className="text-xs italic text-stone-600">
+                      <p className="text-[11pt] italic text-stone-600">
                         Tabel 1. Rincian kegiatan {profile.jabatan.toLowerCase()} {periodText} (Lanjutan)
                       </p>
                     </div>
@@ -1410,7 +1417,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
                   {/* Official Table 1 with strict black borders and consistent column ratios */}
                   <div className="border border-stone-900">
-                    <table className="w-full text-left text-xs border-collapse table-fixed" style={{ width: '100%', tableLayout: 'fixed' }}>
+                    <table className="w-full text-left text-[11pt] border-collapse table-fixed" style={{ width: '100%', tableLayout: 'fixed' }}>
                       <thead>
                         <tr className="border-b border-stone-900 bg-stone-100 font-bold">
                           <th className="border-r border-stone-900 p-2 text-center w-[8%]" style={{ width: '8%' }}>No.</th>
@@ -1534,10 +1541,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <h4 className="font-bold text-sm text-stone-900">
+                    <h4 className="font-bold text-[12pt] text-stone-900">
                       Tabel 2. Dokumentasi Kegiatan
                     </h4>
-                    <p className="text-xs text-stone-500 italic mt-0.5">
+                    <p className="text-[11pt] text-stone-500 italic mt-0.5">
                       Dokumentasi foto kegiatan operasional kebun KPS PVT I Manoko ({periodText})
                     </p>
                   </div>
@@ -1579,12 +1586,12 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
                       <div>
-                        <h4 className="font-bold text-sm text-stone-900">
+                        <h4 className="font-bold text-[12pt] text-stone-900">
                           {pageIdx === 0
                             ? 'Tabel 2. Dokumentasi Kegiatan'
                             : 'Tabel 2. Dokumentasi Kegiatan (Lanjutan)'}
                         </h4>
-                        <p className="text-xs text-stone-500 italic mt-0.5">
+                        <p className="text-[11pt] text-stone-500 italic mt-0.5">
                           Foto kegiatan operasional kebun KPS PVT I Manoko ({periodText})
                         </p>
                       </div>
@@ -1603,9 +1610,9 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
                     {/* Table 2 layout with 2 photos per sheet */}
                     <div className="border border-stone-900">
-                      <table className="w-full text-left text-xs border-collapse table-fixed" style={{ width: '100%', tableLayout: 'fixed' }}>
+                      <table className="w-full text-left text-[11pt] border-collapse table-fixed font-sans" style={{ width: '100%', tableLayout: 'fixed' }}>
                         <thead>
-                          <tr className="border-b border-stone-900 bg-stone-100 font-bold">
+                          <tr className="border-b border-stone-900 bg-stone-100 font-bold text-[11pt]">
                             <th className="border-r border-stone-900 p-2.5 text-center w-[48%]" style={{ width: '48%' }}>
                               Foto Dokumentasi
                             </th>
@@ -1672,7 +1679,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                         rows={3}
                                         value={doc.keterangan}
                                         onChange={(e) => handleUpdatePhotoCaption(actualIdx, e.target.value)}
-                                        className="w-full p-2 text-xs border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
+                                        className="w-full p-2 text-[12pt] border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
                                       />
                                       <div className="pt-1">
                                         <label className="block text-[11px] font-semibold text-stone-600 font-sans">
@@ -1688,25 +1695,25 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                             setCustomPhotos(copy);
                                             setHasCustomEdits(true);
                                           }}
-                                          className="w-full p-1.5 text-xs border border-stone-300 rounded text-stone-700 font-sans"
+                                          className="w-full p-1.5 text-[11pt] border border-stone-300 rounded text-stone-700 font-sans"
                                         />
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className="space-y-2">
+                                    <div className="space-y-2 font-sans">
                                       <div className="flex items-start gap-1.5">
                                         <span className="font-bold text-stone-900">•</span>
-                                        <p className="font-medium text-stone-900 text-xs sm:text-sm">
+                                        <p className="font-medium text-stone-900 text-[12pt] leading-relaxed">
                                           {doc.keterangan}
                                         </p>
                                       </div>
                                       {doc.lokasi && (
-                                        <p className="text-[11px] text-stone-600 pl-3">
+                                        <p className="text-[11pt] text-stone-600 pl-3">
                                           <strong>Lokasi:</strong> {doc.lokasi}
                                         </p>
                                       )}
                                       {doc.tanggal && (
-                                        <p className="text-[11px] text-stone-600 pl-3">
+                                        <p className="text-[11pt] text-stone-600 pl-3">
                                           <strong>Tanggal:</strong> {formatIndonesianDate(doc.tanggal)}
                                         </p>
                                       )}
@@ -1738,7 +1745,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                 <h3 className="text-lg font-bold uppercase tracking-wider">PENUTUP</h3>
               </div>
 
-              <div className="space-y-4 text-sm text-stone-900">
+              <div className="space-y-4 text-[12pt] text-stone-900 leading-relaxed font-sans">
                 {isEditMode ? (
                   <textarea
                     rows={6}
@@ -1747,12 +1754,12 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                       setCustomPenutup(e.target.value);
                       setHasCustomEdits(true);
                     }}
-                    className="w-full p-3 text-sm border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans"
+                    className="w-full p-3 text-[12pt] border-2 border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 bg-amber-50/20 font-sans leading-relaxed"
                   />
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-3 text-[12pt]">
                     {customPenutup.split('\n\n').map((para, idx) => (
-                      <p key={idx} className="indent-8 leading-relaxed">
+                      <p key={idx} className="indent-8 leading-relaxed text-[12pt]">
                         {para}
                       </p>
                     ))}
@@ -1762,13 +1769,13 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
             </div>
 
             {/* Official Signature Block at Bottom Right */}
-            <div className="mt-16 flex flex-col items-end text-sm">
+            <div className="mt-16 flex flex-col items-end text-[12pt] font-sans">
               <div className="text-center w-72 space-y-1">
-                <p>
+                <p className="text-[12pt]">
                   {profile.tempatPenetapan || 'Bandung Barat'},{' '}
                   {formatIndonesianDate(reportConfig.tanggalCetak)}
                 </p>
-                <p className="font-medium text-stone-900">{profile.jabatan || 'Pengelola Pemeliharaan Kebun'}</p>
+                <p className="font-medium text-stone-900 text-[12pt]">{profile.jabatan || 'Pengelola Pemeliharaan Kebun'}</p>
 
                 {/* Digital Signature Graphic */}
                 <div className="h-24 my-2 flex items-center justify-center">
@@ -1783,10 +1790,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                   )}
                 </div>
 
-                <p className="font-bold uppercase tracking-wide text-stone-900 border-b border-stone-900 pb-0.5 inline-block">
+                <p className="font-bold uppercase tracking-wide text-stone-900 border-b border-stone-900 pb-0.5 inline-block text-[12pt]">
                   {profile.nama || 'PEGAWAI KPS PVT I MANOKO'}
                 </p>
-                <p className="font-mono text-xs text-stone-800">
+                <p className="font-mono text-[11pt] text-stone-800">
                   {formatNipNumberOnly(profile.nip)}
                 </p>
               </div>

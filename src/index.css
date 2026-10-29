@@ -38,6 +38,16 @@ html {
   background-color: #ffffff !important;
   color: #111827 !important;
   line-height: 1.5;
+  font-size: 12pt !important;
+}
+
+.report-page p,
+.report-page div.indent-8,
+.report-page textarea,
+.report-page input,
+.report-body-text {
+  font-size: 12pt !important;
+  line-height: 1.5;
 }
 
 .report-page h1,
@@ -126,7 +136,7 @@ html {
     height: auto !important;
     box-shadow: none !important;
     width: 100% !important;
-    font-size: 11pt;
+    font-size: 12pt !important;
     line-height: 1.5;
   }
 

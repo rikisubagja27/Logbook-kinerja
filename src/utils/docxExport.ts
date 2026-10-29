@@ -430,6 +430,7 @@ export async function exportReportToDocx(
         document: {
           run: {
             font: 'Arial',
+            size: 24, // 12pt font standard
             color: '000000',
           },
         },
