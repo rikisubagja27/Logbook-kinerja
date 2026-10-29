@@ -76,13 +76,21 @@ html {
 
 /* Force standard HEX colors for all stone & emerald classes inside report-page to prevent OKLCH errors */
 .report-page [class*="text-stone-"],
-.report-page [class*="text-emerald-"] {
+.report-page [class*="text-emerald-"],
+.report-page [class*="text-gray-"] {
   color: #111827 !important;
 }
 
 .report-page [class*="border-stone-"],
-.report-page [class*="border-emerald-"] {
+.report-page [class*="border-emerald-"],
+.report-page [class*="border-gray-"] {
   border-color: #111827 !important;
+}
+
+.report-page [class*="bg-stone-"],
+.report-page [class*="bg-emerald-"],
+.report-page [class*="bg-amber-"] {
+  background-color: #ffffff !important;
 }
 
 .report-page .bg-stone-100 {

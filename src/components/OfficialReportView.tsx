@@ -15,7 +15,7 @@ import {
 import { resizeImageFile } from '../utils/imageUtils';
 import { downloadOrShareBlob } from '../utils/downloadUtils';
 import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
+import html2canvas from 'html2canvas-pro';
 import { 
   FileDown, 
   Printer, 
@@ -29,7 +29,14 @@ import {
   Image as ImageIcon,
   CheckCircle2,
   ChevronUp,
-  ChevronDown
+  ChevronDown,
+  FlaskConical,
+  Share2,
+  ExternalLink,
+  AlertCircle,
+  X,
+  Download,
+  RefreshCw
 } from 'lucide-react';
 
 interface OfficialReportViewProps {
@@ -56,6 +63,22 @@ export interface Table1RowItem {
   label: string;
   items: string[];
   keterangan: string;
+}
+
+export interface PdfDiagnosticData {
+  deviceType: 'iPhone' | 'iPad' | 'Android' | 'Desktop';
+  osInfo: string;
+  userAgent: string;
+  screenDim: { w: number; h: number; dpr: number };
+  domDim: { offsetW: number; offsetH: number; clientW: number; clientH: number; rectW: number; rectH: number };
+  targetScale: number;
+  renderSuccess: boolean;
+  durationMs: number;
+  canvasDim?: { w: number; h: number };
+  blobSizeKb?: number;
+  thumbnailUrl?: string;
+  testBlobUrl?: string;
+  errorMessage?: string;
 }
 
 export function formatNipNumberOnly(nip?: string): string {
@@ -160,6 +183,15 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   const [pdfProgress, setPdfProgress] = useState<string>('');
   const [isEditMode, setIsEditMode] = useState(false);
   const [isPanelHidden, setIsPanelHidden] = useState(false);
+
+  // Diagnostic Test & Mobile PDF state
+  const [diagnosticData, setDiagnosticData] = useState<PdfDiagnosticData | null>(null);
+  const [isTestingPdf, setIsTestingPdf] = useState(false);
+  const [readyPdfInfo, setReadyPdfInfo] = useState<{
+    blob: Blob;
+    url: string;
+    filename: string;
+  } | null>(null);
 
   // Editable custom overrides state
   const [customTable1, setCustomTable1] = useState<Table1RowItem[]>([]);
@@ -487,6 +519,114 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     return pages;
   }, [customPhotos]);
 
+  // Standardized DOM cleaner for html2canvas-pro to guarantee clean A4 output without cutoffs or style artifacts
+  const sanitizeReportClonedDoc = (clonedDoc: Document) => {
+    // Strip card borders, shadows, and rounded corners in cloned document for pure paper output
+    const clonedPages = clonedDoc.querySelectorAll<HTMLElement>('.report-page');
+    clonedPages.forEach((p) => {
+      p.style.boxShadow = 'none';
+      p.style.borderRadius = '0px';
+      p.style.border = 'none';
+      p.style.width = '794px';
+      p.style.minHeight = '1123px';
+      p.style.backgroundColor = '#ffffff';
+      p.style.margin = '0 auto';
+      p.style.fontFamily = 'Arial, sans-serif';
+      p.style.boxSizing = 'border-box';
+      if (p.classList.contains('report-cover-page')) {
+        p.style.display = 'flex';
+        p.style.flexDirection = 'column';
+        p.style.justifyContent = 'space-between';
+        p.style.alignItems = 'center';
+        p.style.textAlign = 'center';
+        p.style.height = '1123px';
+        p.style.maxHeight = '1123px';
+        p.style.overflow = 'hidden';
+        p.style.padding = '48px 40px';
+      }
+    });
+
+    // Enforce Arial MT for all titles/headings and Arial for content
+    const clonedHeadings = clonedDoc.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, th, .report-title');
+    clonedHeadings.forEach((h) => {
+      h.style.fontFamily = "'Arial MT', Arial, 'Helvetica Neue', Helvetica, sans-serif";
+      h.style.color = '#000000';
+    });
+
+    const coverText = clonedDoc.querySelectorAll<HTMLElement>('.report-cover-page h1, .report-cover-page h2, .report-cover-page h3, .report-cover-page p');
+    coverText.forEach((t) => {
+      t.style.textAlign = 'center';
+    });
+
+    const clonedBodies = clonedDoc.querySelectorAll<HTMLElement>('p, td, input, textarea, span, div');
+    clonedBodies.forEach((b) => {
+      if (!b.matches('h1, h2, h3, h4, h5, th, .report-title')) {
+        b.style.fontFamily = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
+      }
+    });
+
+    // Hide all interactive UI / controls in cloned document
+    const noPrintElements = clonedDoc.querySelectorAll<HTMLElement>('.no-print');
+    noPrintElements.forEach((el) => {
+      el.style.display = 'none';
+    });
+
+    const win = clonedDoc.defaultView;
+    if (win && typeof win.getComputedStyle === 'function') {
+      const origGetComputedStyle = win.getComputedStyle.bind(win);
+      win.getComputedStyle = function (el: Element, pseudo?: string | null) {
+        const style = origGetComputedStyle(el, pseudo);
+        return new Proxy(style, {
+          get(target: any, prop: string | symbol) {
+            if (prop === 'getPropertyValue') {
+              return function (propName: string) {
+                const val = target.getPropertyValue(propName);
+                return cleanColorString(val);
+              };
+            }
+            const val = target[prop];
+            if (typeof val === 'function') {
+              return function (...args: any[]) {
+                const res = val.apply(target, args);
+                if (typeof res === 'string') {
+                  return cleanColorString(res);
+                }
+                return res;
+              };
+            }
+            if (typeof val === 'string') {
+              return cleanColorString(val);
+            }
+            return val;
+          },
+        });
+      };
+    }
+
+    // Clean all text inside <style> tags in cloned document
+    const styleTags = clonedDoc.querySelectorAll('style');
+    styleTags.forEach((s) => {
+      if (s.textContent && (s.textContent.includes('oklch') || s.textContent.includes('oklab') || s.textContent.includes('color-mix') || s.textContent.includes('light-dark'))) {
+        s.textContent = cleanColorString(s.textContent);
+      }
+    });
+
+    // Sanitize inline styles on all nodes
+    const allNodes = clonedDoc.querySelectorAll('*');
+    allNodes.forEach((node) => {
+      const el = node as HTMLElement;
+      if (!el.style) return;
+      try {
+        ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor', 'fill', 'stroke'].forEach((attr) => {
+          const current = (el.style as any)[attr];
+          if (current && typeof current === 'string' && (current.includes('oklch') || current.includes('oklab') || current.includes('color-mix') || current.includes('light-dark'))) {
+            (el.style as any)[attr] = cleanColorString(current);
+          }
+        });
+      } catch {}
+    });
+  };
+
   // DIRECT HIGH-FIDELITY PDF GENERATOR (Authentic A4 proportions, no squishing, crisp vectors)
   const handleDownloadPdf = async () => {
     try {
@@ -510,124 +650,68 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       const totalPages = pages.length;
       let isFirstPage = true;
 
+      // Adaptive scaling based on device constraints (iPhone/Android optimized)
+      const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+      const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+      const isMobile = isIOS || isAndroid;
+      const targetScale = isMobile ? 1.5 : 2;
+
       for (let i = 0; i < totalPages; i++) {
         setPdfProgress(`Memproses halaman ${i + 1} dari ${totalPages}...`);
         const pageElem = pages[i];
+        console.log(`[PDF Generator] Rendering page ${i + 1}/${totalPages}: width=${pageElem.offsetWidth}px, height=${pageElem.offsetHeight}px, scale=${targetScale}`);
 
-        // Render page element to canvas at fixed 800px width with 2x resolution
-        const canvas = await html2canvas(pageElem, {
-          scale: 2, // 2x for sharp crisp text and images
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          windowWidth: 800,
-          onclone: (clonedDoc) => {
-            // Strip card borders, shadows, and rounded corners in cloned document for pure paper output
-            const clonedPages = clonedDoc.querySelectorAll<HTMLElement>('.report-page');
-            clonedPages.forEach((p) => {
-              p.style.boxShadow = 'none';
-              p.style.borderRadius = '0px';
-              p.style.border = 'none';
-              p.style.width = '794px';
-              p.style.minHeight = '1123px';
-              p.style.backgroundColor = '#ffffff';
-              p.style.margin = '0 auto';
-              p.style.fontFamily = 'Arial, sans-serif';
-              p.style.boxSizing = 'border-box';
-              if (p.classList.contains('report-cover-page')) {
-                p.style.display = 'flex';
-                p.style.flexDirection = 'column';
-                p.style.justifyContent = 'space-between';
-                p.style.alignItems = 'center';
-                p.style.textAlign = 'center';
-                p.style.height = '1123px';
-                p.style.maxHeight = '1123px';
-                p.style.overflow = 'hidden';
-                p.style.padding = '48px 40px';
-              }
+        let canvas: HTMLCanvasElement;
+        try {
+          canvas = await html2canvas(pageElem, {
+            scale: targetScale,
+            useCORS: true,
+            allowTaint: true,
+            logging: false,
+            backgroundColor: '#ffffff',
+            scrollX: 0,
+            scrollY: 0,
+            x: 0,
+            y: 0,
+            windowWidth: 794,
+            width: 794,
+            onclone: sanitizeReportClonedDoc,
+          });
+        } catch (renderErr) {
+          console.warn(`Render page ${i + 1} at scale ${targetScale} failed, retrying with fallback scale 1.2:`, renderErr);
+          try {
+            canvas = await html2canvas(pageElem, {
+              scale: 1.2,
+              useCORS: true,
+              allowTaint: true,
+              logging: false,
+              backgroundColor: '#ffffff',
+              scrollX: 0,
+              scrollY: 0,
+              x: 0,
+              y: 0,
+              windowWidth: 794,
+              width: 794,
+              onclone: sanitizeReportClonedDoc,
             });
-
-            // Enforce Arial MT for all titles/headings and Arial for content
-            const clonedHeadings = clonedDoc.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, th, .report-title');
-            clonedHeadings.forEach((h) => {
-              h.style.fontFamily = "'Arial MT', Arial, 'Helvetica Neue', Helvetica, sans-serif";
-              h.style.color = '#000000';
+          } catch (retryErr) {
+            console.warn(`Fallback scale 1.2 failed, retrying with baseline scale 1.0:`, retryErr);
+            canvas = await html2canvas(pageElem, {
+              scale: 1.0,
+              useCORS: true,
+              allowTaint: true,
+              logging: false,
+              backgroundColor: '#ffffff',
+              scrollX: 0,
+              scrollY: 0,
+              x: 0,
+              y: 0,
+              windowWidth: 794,
+              width: 794,
+              onclone: sanitizeReportClonedDoc,
             });
-
-            const coverText = clonedDoc.querySelectorAll<HTMLElement>('.report-cover-page h1, .report-cover-page h2, .report-cover-page h3, .report-cover-page p');
-            coverText.forEach((t) => {
-              t.style.textAlign = 'center';
-            });
-
-            const clonedBodies = clonedDoc.querySelectorAll<HTMLElement>('p, td, input, textarea, span, div');
-            clonedBodies.forEach((b) => {
-              if (!b.matches('h1, h2, h3, h4, h5, th, .report-title')) {
-                b.style.fontFamily = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
-              }
-            });
-
-            // Hide all interactive UI / controls in cloned document
-            const noPrintElements = clonedDoc.querySelectorAll<HTMLElement>('.no-print');
-            noPrintElements.forEach((el) => {
-              el.style.display = 'none';
-            });
-
-            const win = clonedDoc.defaultView;
-            if (win && typeof win.getComputedStyle === 'function') {
-              const origGetComputedStyle = win.getComputedStyle.bind(win);
-              win.getComputedStyle = function (el: Element, pseudo?: string | null) {
-                const style = origGetComputedStyle(el, pseudo);
-                return new Proxy(style, {
-                  get(target: any, prop: string | symbol) {
-                    if (prop === 'getPropertyValue') {
-                      return function (propName: string) {
-                        const val = target.getPropertyValue(propName);
-                        return cleanColorString(val);
-                      };
-                    }
-                    const val = target[prop];
-                    if (typeof val === 'function') {
-                      return function (...args: any[]) {
-                        const res = val.apply(target, args);
-                        if (typeof res === 'string') {
-                          return cleanColorString(res);
-                        }
-                        return res;
-                      };
-                    }
-                    if (typeof val === 'string') {
-                      return cleanColorString(val);
-                    }
-                    return val;
-                  },
-                });
-              };
-            }
-
-            // Clean all text inside <style> tags in cloned document
-            const styleTags = clonedDoc.querySelectorAll('style');
-            styleTags.forEach((s) => {
-              if (s.textContent && (s.textContent.includes('oklch') || s.textContent.includes('oklab') || s.textContent.includes('color-mix') || s.textContent.includes('light-dark'))) {
-                s.textContent = cleanColorString(s.textContent);
-              }
-            });
-
-            // Sanitize inline styles on all nodes
-            const allNodes = clonedDoc.querySelectorAll('*');
-            allNodes.forEach((node) => {
-              const el = node as HTMLElement;
-              if (!el.style) return;
-              try {
-                ['color', 'backgroundColor', 'borderColor', 'borderTopColor', 'borderRightColor', 'borderBottomColor', 'borderLeftColor', 'outlineColor', 'fill', 'stroke'].forEach((attr) => {
-                  const current = (el.style as any)[attr];
-                  if (current && typeof current === 'string' && (current.includes('oklch') || current.includes('oklab') || current.includes('color-mix') || current.includes('light-dark'))) {
-                    (el.style as any)[attr] = cleanColorString(current);
-                  }
-                });
-              } catch {}
-            });
-          },
-        });
+          }
+        }
 
         // Exact A4 height in canvas pixels (A4 aspect ratio: 297 / 210 = ~1.41428)
         const a4HeightPx = Math.floor(canvas.width * (297 / 210));
@@ -665,8 +749,14 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
             pdf.addImage(sliceImgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
             isFirstPage = false;
             sourceY += a4HeightPx;
+            sliceCanvas.width = 0;
+            sliceCanvas.height = 0;
           }
         }
+
+        // Immediate memory release for iOS Safari / Android WebView
+        canvas.width = 0;
+        canvas.height = 0;
       }
 
       setPdfProgress('Menyimpan file PDF...');
@@ -675,7 +765,20 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       const filename = `Laporan_Kinerja_${cleanName}_${cleanTitle}.pdf`;
 
       const pdfBlob = pdf.output('blob');
-      await downloadOrShareBlob(pdfBlob, filename, `Laporan Kinerja - ${periodTitle}`);
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      // Save into state so user can also open/share directly if mobile browser limits background triggers
+      setReadyPdfInfo({
+        blob: pdfBlob,
+        url: pdfUrl,
+        filename,
+      });
+
+      try {
+        await downloadOrShareBlob(pdfBlob, filename, `Laporan Kinerja - ${periodTitle}`);
+      } catch (dlErr) {
+        console.warn('Auto download error, but PDF is ready in modal:', dlErr);
+      }
       setPdfProgress('');
     } catch (err: any) {
       console.error('PDF export error:', err);
@@ -683,6 +786,139 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     } finally {
       setIsGeneratingPdf(false);
       setPdfProgress('');
+    }
+  };
+
+  // TEST PDF EXPORT DIAGNOSTIC FUNCTION (Targets DOM, logs dimensions to console, tests smaller scale)
+  const handleTestPdfExport = async () => {
+    try {
+      setIsTestingPdf(true);
+      const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+      const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+      const isTablet = isIOS && (window.innerWidth >= 768 || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !/iPhone|iPod/.test(navigator.userAgent)));
+      
+      let deviceType: 'iPhone' | 'iPad' | 'Android' | 'Desktop' = 'Desktop';
+      if (isIOS) {
+        deviceType = isTablet ? 'iPad' : 'iPhone';
+      } else if (isAndroid) {
+        deviceType = 'Android';
+      }
+
+      const pages = document.querySelectorAll<HTMLElement>('.report-page');
+      if (pages.length === 0) {
+        throw new Error('Elemen halaman laporan (.report-page) tidak ditemukan di DOM');
+      }
+
+      const targetElem = pages[0];
+      const rect = targetElem.getBoundingClientRect();
+      const domDim = {
+        offsetW: targetElem.offsetWidth,
+        offsetH: targetElem.offsetHeight,
+        clientW: targetElem.clientWidth,
+        clientH: targetElem.clientHeight,
+        rectW: Math.round(rect.width),
+        rectH: Math.round(rect.height),
+      };
+
+      const screenDim = {
+        w: window.innerWidth,
+        h: window.innerHeight,
+        dpr: window.devicePixelRatio || 1,
+      };
+
+      console.group('🧪 [Test PDF Export] DOM & Device Diagnostics');
+      console.log('User Agent:', navigator.userAgent);
+      console.log('Platform:', navigator.platform);
+      console.log('Device Type:', deviceType);
+      console.log('Screen Metrics:', `${screenDim.w}x${screenDim.h} (DPR: ${screenDim.dpr})`);
+      console.table({
+        'Device': deviceType,
+        'Screen Width': `${screenDim.w}px`,
+        'Screen Height': `${screenDim.h}px`,
+        'Device Pixel Ratio': screenDim.dpr,
+        'DOM Page Width (offsetWidth)': `${domDim.offsetW}px`,
+        'DOM Page Height (offsetHeight)': `${domDim.offsetH}px`,
+        'DOM Client Width': `${domDim.clientW}px`,
+        'DOM Client Height': `${domDim.clientH}px`,
+        'BoundingRect Width': `${domDim.rectW}px`,
+        'BoundingRect Height': `${domDim.rectH}px`,
+      });
+      console.groupEnd();
+
+      const startTime = performance.now();
+      const testScale = 1.2; // smaller-scale rendering first to verify device compatibility
+
+      const canvas = await html2canvas(targetElem, {
+        scale: testScale,
+        useCORS: true,
+        allowTaint: true,
+        scrollX: 0,
+        scrollY: 0,
+        x: 0,
+        y: 0,
+        windowWidth: 794,
+        width: 794,
+        backgroundColor: '#ffffff',
+        logging: false,
+        onclone: sanitizeReportClonedDoc,
+      });
+
+      const durationMs = Math.round(performance.now() - startTime);
+      const canvasDim = { w: canvas.width, h: canvas.height };
+
+      console.log(`🧪 [Test PDF Export] Canvas rendered successfully in ${durationMs}ms:`, canvasDim);
+
+      // Attempt 1-page test PDF creation
+      const testPdf = new jsPDF({
+        orientation: 'p',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.85);
+      testPdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+      const testBlob = testPdf.output('blob');
+      const testBlobUrl = URL.createObjectURL(testBlob);
+      const blobSizeKb = Math.round(testBlob.size / 1024);
+
+      // Clean up canvas memory immediately
+      canvas.width = 0;
+      canvas.height = 0;
+
+      setDiagnosticData({
+        deviceType,
+        osInfo: navigator.userAgent.includes('iPhone') ? 'iOS iPhone' : navigator.userAgent.includes('iPad') ? 'iPadOS Tablet' : navigator.userAgent.includes('Android') ? 'Android Mobile' : 'Desktop Browser',
+        userAgent: navigator.userAgent,
+        screenDim,
+        domDim,
+        targetScale: testScale,
+        renderSuccess: true,
+        durationMs,
+        canvasDim,
+        blobSizeKb,
+        thumbnailUrl: imgData,
+        testBlobUrl,
+      });
+
+    } catch (err: any) {
+      console.error('🧪 [Test PDF Export] Error:', err);
+      const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
+      const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
+      
+      setDiagnosticData({
+        deviceType: isIOS ? 'iPhone' : isAndroid ? 'Android' : 'Desktop',
+        osInfo: navigator.userAgent,
+        userAgent: navigator.userAgent,
+        screenDim: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 },
+        domDim: { offsetW: 0, offsetH: 0, clientW: 0, clientH: 0, rectW: 0, rectH: 0 },
+        targetScale: 1.2,
+        renderSuccess: false,
+        durationMs: 0,
+        errorMessage: err.message || 'Terjadi kesalahan saat uji render',
+      });
+    } finally {
+      setIsTestingPdf(false);
     }
   };
 
@@ -744,6 +980,16 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
             >
               <FileDown className="w-3.5 h-3.5" />
               <span>{isExportingDocx ? 'Word...' : 'Word (.docx)'}</span>
+            </button>
+
+            <button
+              onClick={handleTestPdfExport}
+              disabled={isTestingPdf || isGeneratingPdf}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 border border-purple-500/30 cursor-pointer"
+              title="Uji render DOM dan deteksi kompatibilitas canvas PDF di perangkat Anda (iPhone/Android)"
+            >
+              <FlaskConical className={`w-3.5 h-3.5 ${isTestingPdf ? 'animate-spin' : 'text-purple-300'}`} />
+              <span>{isTestingPdf ? 'Menguji...' : 'Uji Render'}</span>
             </button>
 
             <button
@@ -1518,6 +1764,227 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         </div>
 
       </div>
+
+      {/* ==================== MODAL 1: UJI RENDER PDF DIAGNOSTIK ==================== */}
+      {diagnosticData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm animate-fade-in no-print">
+          <div className="bg-stone-900 border border-stone-700/80 rounded-2xl shadow-2xl max-w-lg w-full p-5 text-white space-y-4 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+              <div className="flex items-center gap-2">
+                <FlaskConical className="w-5 h-5 text-purple-400" />
+                <h3 className="text-base font-bold text-white">Hasil Uji Render PDF (Diagnostik)</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDiagnosticData(null)}
+                className="p-1.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Status Summary Banner */}
+            {diagnosticData.renderSuccess ? (
+              <div className="bg-emerald-950/70 border border-emerald-500/50 p-3.5 rounded-xl flex items-start gap-3">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <p className="font-bold text-emerald-300">Uji Render DOM Berhasil!</p>
+                  <p className="text-stone-300 leading-relaxed">
+                    Browser Anda berhasil mengonversi DOM laporan menjadi canvas dan file PDF tanpa error OKLCH. Mesin rendering kompatibel.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="bg-red-950/70 border border-red-500/50 p-3.5 rounded-xl flex items-start gap-3">
+                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
+                <div className="text-xs space-y-1">
+                  <p className="font-bold text-red-300">Uji Render Menemukan Kendala</p>
+                  <p className="text-stone-300 leading-relaxed break-words">
+                    {diagnosticData.errorMessage || 'Terjadi kesalahan sistem saat pengujian.'}
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Diagnostic Metrics Table */}
+            <div className="bg-stone-950/70 border border-stone-800 rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="font-bold text-stone-300 uppercase tracking-wider text-[10px] pb-1 border-b border-stone-800">
+                Informasi Perangkat & Metrik DOM
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 text-stone-300">
+                <div>
+                  <span className="text-stone-400 block text-[11px]">Tipe Perangkat:</span>
+                  <span className="font-semibold text-white">{diagnosticData.deviceType} ({diagnosticData.osInfo})</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block text-[11px]">Resolusi Layar (DPR):</span>
+                  <span className="font-semibold text-white">{diagnosticData.screenDim.w} x {diagnosticData.screenDim.h} px ({diagnosticData.screenDim.dpr}x)</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block text-[11px]">Dimensi DOM Halaman 1:</span>
+                  <span className="font-semibold text-white">{diagnosticData.domDim.offsetW} x {diagnosticData.domDim.offsetH} px</span>
+                </div>
+                <div>
+                  <span className="text-stone-400 block text-[11px]">Skala Uji (Render Scale):</span>
+                  <span className="font-semibold text-white">{diagnosticData.targetScale}x</span>
+                </div>
+                {diagnosticData.renderSuccess && (
+                  <>
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Ukuran Canvas Hasil:</span>
+                      <span className="font-semibold text-emerald-400">{diagnosticData.canvasDim?.w} x {diagnosticData.canvasDim?.h} px</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Waktu Render / Ukuran:</span>
+                      <span className="font-semibold text-emerald-400">{diagnosticData.durationMs} ms ({diagnosticData.blobSizeKb} KB)</span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+
+            {/* Live Thumbnail Preview */}
+            {diagnosticData.thumbnailUrl && (
+              <div className="space-y-1.5">
+                <span className="text-[11px] font-semibold text-stone-300 block">
+                  Pratinjau Hasil Render (Halaman 1):
+                </span>
+                <div className="bg-stone-950 p-2 rounded-xl border border-stone-800 flex justify-center max-h-48 overflow-hidden">
+                  <img
+                    src={diagnosticData.thumbnailUrl}
+                    alt="Pratinjau Uji Render"
+                    className="max-h-44 object-contain rounded border border-stone-700 shadow-md"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Modal Actions */}
+            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-stone-800">
+              {diagnosticData.testBlobUrl && (
+                <a
+                  href={diagnosticData.testBlobUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold transition-colors cursor-pointer border border-stone-600"
+                >
+                  <ExternalLink className="w-3.5 h-3.5" />
+                  <span>Buka PDF Hasil Uji</span>
+                </a>
+              )}
+              {diagnosticData.renderSuccess && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDiagnosticData(null);
+                    handleDownloadPdf();
+                  }}
+                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-colors cursor-pointer"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span>Unduh Dokumen Lengkap</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setDiagnosticData(null)}
+                className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-medium transition-colors cursor-pointer"
+              >
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL 2: NOTIFIKASI & AKSI PDF SIAP (Optimasi Mobile Safari & Android) ==================== */}
+      {readyPdfInfo && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-stone-950/75 backdrop-blur-sm animate-fade-in no-print">
+          <div className="bg-stone-900 border border-emerald-500/40 rounded-2xl shadow-2xl max-w-md w-full p-5 text-white space-y-4">
+            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="w-5 h-5 text-emerald-400" />
+                <h3 className="text-base font-bold text-white">File PDF Selesai Dibuat</h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReadyPdfInfo(null)}
+                className="p-1.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <p className="text-xs text-stone-300 leading-relaxed">
+              Dokumen PDF resmi telah berhasil diproses dengan standar layout PVTPP Kementan. Pilih tindakan di bawah ini untuk membuka atau menyimpan ke perangkat:
+            </p>
+
+            <div className="p-3 bg-stone-950/80 rounded-xl border border-stone-800 text-xs space-y-1">
+              <span className="text-stone-400 block text-[11px]">Nama Berkas:</span>
+              <p className="font-mono text-emerald-300 font-semibold truncate">{readyPdfInfo.filename}</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              {/* Direct Open in New Tab - 100% reliable on Safari & Chrome */}
+              <button
+                type="button"
+                onClick={() => {
+                  window.open(readyPdfInfo.url, '_blank');
+                }}
+                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
+              >
+                <ExternalLink className="w-4 h-4" />
+                <span>Buka / Lihat PDF</span>
+              </button>
+
+              {/* Native Mobile Share Sheet (Files / WhatsApp / Drive) triggered by direct tap */}
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    const file = new File([readyPdfInfo.blob], readyPdfInfo.filename, {
+                      type: 'application/pdf',
+                      lastModified: Date.now(),
+                    });
+                    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+                      await navigator.share({
+                        files: [file],
+                        title: readyPdfInfo.filename,
+                        text: `Laporan Kinerja - ${periodTitle}`,
+                      });
+                    } else {
+                      // Fallback anchor click
+                      const link = document.createElement('a');
+                      link.href = readyPdfInfo.url;
+                      link.download = readyPdfInfo.filename;
+                      link.click();
+                    }
+                  } catch (err: any) {
+                    if (err.name !== 'AbortError') {
+                      window.open(readyPdfInfo.url, '_blank');
+                    }
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
+              >
+                <Share2 className="w-4 h-4" />
+                <span>Bagikan / Simpan</span>
+              </button>
+            </div>
+
+            <div className="text-center pt-1">
+              <button
+                type="button"
+                onClick={() => setReadyPdfInfo(null)}
+                className="text-xs text-stone-400 hover:text-stone-200 transition-colors cursor-pointer"
+              >
+                Tutup jendela ini
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
