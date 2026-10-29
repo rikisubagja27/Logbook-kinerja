@@ -33,6 +33,7 @@ import {
   ArrowRight,
   ExternalLink
 } from 'lucide-react';
+import { ManualRefreshAppButton } from './AppUpdateNotification';
 
 interface ProfileViewProps {
   profile: UserProfile;
@@ -1050,6 +1051,11 @@ export const ProfileView: React.FC<ProfileViewProps> = ({
           </button>
         </div>
       </form>
+
+      {/* App Version & Refresh Card */}
+      <div className="pt-2">
+        <ManualRefreshAppButton variant="card" />
+      </div>
     </div>
   );
 };

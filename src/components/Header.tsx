@@ -2,6 +2,7 @@ import React from 'react';
 import { UserProfile } from '../types/logbook';
 import { cleanNipDigits } from '../utils/storage';
 import { PWAInstallButton } from './PWAInstallButton';
+import { ManualRefreshAppButton } from './AppUpdateNotification';
 import { User } from 'lucide-react';
 
 interface HeaderProps {
@@ -144,6 +145,9 @@ export function Header({ activeTab, setActiveTab, profile }: HeaderProps) {
 
           {/* Tombol Pasang Aplikasi Native / PWA */}
           <PWAInstallButton variant="compact" />
+
+          {/* Tombol Segarkan / Perbarui Versi Aplikasi */}
+          <ManualRefreshAppButton variant="header" />
 
         </div>
 

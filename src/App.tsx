@@ -30,6 +30,7 @@ import { EPersonalView } from './components/EPersonalView';
 import { ProfileView } from './components/ProfileView';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
+import { AppUpdateNotification } from './components/AppUpdateNotification';
 import { CloudSyncView } from './components/CloudSyncView';
 
 export default function App() {
@@ -217,6 +218,9 @@ export default function App() {
 
       {/* Offline Status Alert */}
       <OfflineIndicator />
+
+      {/* PWA App Update Notification & Feedback Toast */}
+      <AppUpdateNotification />
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16 space-y-4">
