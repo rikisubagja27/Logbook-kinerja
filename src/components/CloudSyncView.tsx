@@ -62,6 +62,8 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({
         setErrorMsg('Jendela pop-up Google terblokir. Harap izinkan pop-up di peramban Anda.');
       } else if (code === 'auth/cancelled-popup-request') {
         setErrorMsg(null);
+      } else if (msg.includes('token-service-api') || msg.includes('securetoken.googleapis.com')) {
+        setErrorMsg('Layanan Secure Token Firebase sedang dalam proses inisialisasi / propagasi di Google Cloud. Silakan tunggu 1-2 menit lalu coba kembali.');
       } else {
         setErrorMsg(msg || 'Gagal masuk dengan Google. Pastikan koneksi internet aktif.');
       }

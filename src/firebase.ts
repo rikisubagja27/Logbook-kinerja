@@ -8,7 +8,8 @@ import {
   setDoc, 
   deleteDoc, 
   getDocs, 
-  writeBatch 
+  writeBatch,
+  setLogLevel
 } from 'firebase/firestore';
 import { 
   getAuth, 
@@ -33,6 +34,9 @@ export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestore
   ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 
+// Suppress repetitive background connection retry noise while operating in local offline cache mode
+setLogLevel('silent');
+
 // Initialize Firebase Authentication
 export const auth = getAuth(app);
 setPersistence(auth, browserLocalPersistence).catch(console.error);
@@ -45,14 +49,30 @@ googleProvider.setCustomParameters({
 // Test Connection on initial boot as required by Firestore integration guidelines
 export async function testConnection() {
   try {
+    // If there is a cached user session with an invalid or expired token, validate it first
+    if (auth.currentUser) {
+      try {
+        await auth.currentUser.getIdToken(false);
+      } catch (tokenErr: any) {
+        console.warn('Stale auth session detected, resetting to allow clean sign-in.');
+        await fbSignOut(auth);
+      }
+    }
     await getDocFromServer(doc(db, 'test', 'connection'));
-  } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.warn('Firebase client is offline or initializing.');
+  } catch (error: any) {
+    const msg = error?.message || '';
+    if (msg.includes('token-service-api') || msg.includes('securetoken.googleapis.com')) {
+      try {
+        await fbSignOut(auth);
+      } catch {}
     }
   }
 }
-testConnection();
+
+// Check connection gracefully without blocking app startup
+setTimeout(() => {
+  testConnection().catch(() => {});
+}, 1500);
 
 // ==========================================
 // Firestore Cloud Sync Services

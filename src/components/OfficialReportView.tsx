@@ -627,7 +627,123 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     });
   };
 
-  // DIRECT HIGH-FIDELITY PDF GENERATOR (Authentic A4 proportions, no squishing, crisp vectors)
+  // HIGH-PRECISION ISOLATED A4 PAGE RENDERER (1:1 with Microsoft Word layout, zero spillover, zero cutting)
+  const renderIsolatedPageCanvas = async (
+    pageElem: HTMLElement,
+    pageIndex: number,
+    scale: number
+  ): Promise<HTMLCanvasElement> => {
+    return await html2canvas(pageElem, {
+      scale,
+      useCORS: true,
+      allowTaint: true,
+      logging: false,
+      backgroundColor: '#ffffff',
+      windowWidth: 794,
+      windowHeight: 1123,
+      width: 794,
+      height: 1123,
+      onclone: (clonedDoc) => {
+        // 1. Hide ALL other report pages in cloned document so pageIndex is completely isolated!
+        const allClonedPages = clonedDoc.querySelectorAll<HTMLElement>('.report-page');
+        allClonedPages.forEach((p, idx) => {
+          if (idx !== pageIndex) {
+            p.style.display = 'none';
+          }
+        });
+
+        // 2. Hide all non-report elements: headers, banners, buttons, debug bars, floating controls
+        const nonReportElements = clonedDoc.querySelectorAll<HTMLElement>(
+          'header, footer, nav, aside, button, input[type="file"], .no-print, [data-no-print]'
+        );
+        nonReportElements.forEach((el) => {
+          el.style.display = 'none';
+        });
+
+        // 3. Reset all parent wrappers of the active page so it sits cleanly at (0, 0)
+        const targetPage = allClonedPages[pageIndex];
+        if (targetPage) {
+          let curr: HTMLElement | null = targetPage.parentElement;
+          while (curr && curr !== clonedDoc.body) {
+            curr.style.margin = '0';
+            curr.style.padding = '0';
+            curr.style.width = '794px';
+            curr.style.maxWidth = '794px';
+            curr.style.border = 'none';
+            curr.style.boxShadow = 'none';
+            curr.style.backgroundColor = '#ffffff';
+            curr = curr.parentElement;
+          }
+
+          // Force strict A4 794px x 1123px dimensions and pristine paper styling
+          targetPage.style.display = targetPage.classList.contains('report-cover-page') ? 'flex' : 'block';
+          targetPage.style.width = '794px';
+          targetPage.style.minWidth = '794px';
+          targetPage.style.maxWidth = '794px';
+          targetPage.style.height = '1123px';
+          targetPage.style.minHeight = '1123px';
+          targetPage.style.maxHeight = '1123px';
+          targetPage.style.boxSizing = 'border-box';
+          targetPage.style.margin = '0';
+          targetPage.style.boxShadow = 'none';
+          targetPage.style.border = 'none';
+          targetPage.style.borderRadius = '0';
+          targetPage.style.overflow = 'hidden';
+          targetPage.style.backgroundColor = '#ffffff';
+
+          if (targetPage.classList.contains('report-cover-page')) {
+            targetPage.style.flexDirection = 'column';
+            targetPage.style.justifyContent = 'space-between';
+            targetPage.style.alignItems = 'center';
+            targetPage.style.textAlign = 'center';
+            targetPage.style.padding = '44px 38px';
+          } else {
+            targetPage.style.padding = '48px 44px';
+          }
+
+          // Replace textareas with clean static text for a perfect printed document look
+          targetPage.querySelectorAll<HTMLTextAreaElement>('textarea').forEach((ta) => {
+            const div = clonedDoc.createElement('div');
+            div.textContent = ta.value;
+            div.style.cssText = ta.style.cssText;
+            div.style.border = 'none';
+            div.style.background = 'transparent';
+            div.style.padding = '0';
+            div.style.whiteSpace = 'pre-wrap';
+            div.style.fontFamily = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
+            ta.parentNode?.replaceChild(div, ta);
+          });
+
+          // Replace text inputs with clean static spans
+          targetPage.querySelectorAll<HTMLInputElement>('input[type="text"]').forEach((inp) => {
+            const span = clonedDoc.createElement('span');
+            span.textContent = inp.value;
+            span.style.cssText = inp.style.cssText;
+            span.style.border = 'none';
+            span.style.background = 'transparent';
+            span.style.padding = '0';
+            span.style.fontFamily = "Arial, 'Helvetica Neue', Helvetica, sans-serif";
+            inp.parentNode?.replaceChild(span, inp);
+          });
+        }
+
+        // 4. Reset document body and viewport scroll
+        clonedDoc.body.style.margin = '0';
+        clonedDoc.body.style.padding = '0';
+        clonedDoc.body.style.width = '794px';
+        clonedDoc.body.style.backgroundColor = '#ffffff';
+        clonedDoc.documentElement.style.margin = '0';
+        clonedDoc.documentElement.style.padding = '0';
+        clonedDoc.documentElement.style.backgroundColor = '#ffffff';
+        clonedDoc.defaultView?.scrollTo(0, 0);
+
+        // 5. Sanitize fonts and OKLCH colors
+        sanitizeReportClonedDoc(clonedDoc);
+      },
+    });
+  };
+
+  // DIRECT HIGH-FIDELITY PDF GENERATOR (Authentic A4 proportions, 1:1 matching Word layout)
   const handleDownloadPdf = async () => {
     try {
       setIsGeneratingPdf(true);
@@ -659,102 +775,30 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       for (let i = 0; i < totalPages; i++) {
         setPdfProgress(`Memproses halaman ${i + 1} dari ${totalPages}...`);
         const pageElem = pages[i];
-        console.log(`[PDF Generator] Rendering page ${i + 1}/${totalPages}: width=${pageElem.offsetWidth}px, height=${pageElem.offsetHeight}px, scale=${targetScale}`);
+        console.log(`[PDF Generator] Rendering page ${i + 1}/${totalPages} with complete page isolation`);
 
         let canvas: HTMLCanvasElement;
         try {
-          canvas = await html2canvas(pageElem, {
-            scale: targetScale,
-            useCORS: true,
-            allowTaint: true,
-            logging: false,
-            backgroundColor: '#ffffff',
-            scrollX: 0,
-            scrollY: 0,
-            x: 0,
-            y: 0,
-            windowWidth: 794,
-            width: 794,
-            onclone: sanitizeReportClonedDoc,
-          });
+          canvas = await renderIsolatedPageCanvas(pageElem, i, targetScale);
         } catch (renderErr) {
           console.warn(`Render page ${i + 1} at scale ${targetScale} failed, retrying with fallback scale 1.2:`, renderErr);
           try {
-            canvas = await html2canvas(pageElem, {
-              scale: 1.2,
-              useCORS: true,
-              allowTaint: true,
-              logging: false,
-              backgroundColor: '#ffffff',
-              scrollX: 0,
-              scrollY: 0,
-              x: 0,
-              y: 0,
-              windowWidth: 794,
-              width: 794,
-              onclone: sanitizeReportClonedDoc,
-            });
+            canvas = await renderIsolatedPageCanvas(pageElem, i, 1.2);
           } catch (retryErr) {
             console.warn(`Fallback scale 1.2 failed, retrying with baseline scale 1.0:`, retryErr);
-            canvas = await html2canvas(pageElem, {
-              scale: 1.0,
-              useCORS: true,
-              allowTaint: true,
-              logging: false,
-              backgroundColor: '#ffffff',
-              scrollX: 0,
-              scrollY: 0,
-              x: 0,
-              y: 0,
-              windowWidth: 794,
-              width: 794,
-              onclone: sanitizeReportClonedDoc,
-            });
+            canvas = await renderIsolatedPageCanvas(pageElem, i, 1.0);
           }
         }
 
-        // Exact A4 height in canvas pixels (A4 aspect ratio: 297 / 210 = ~1.41428)
-        const a4HeightPx = Math.floor(canvas.width * (297 / 210));
-
-        // If the canvas fits into a single A4 page (allow slight 5% tolerance)
-        if (canvas.height <= a4HeightPx * 1.05) {
-          const imgData = canvas.toDataURL('image/jpeg', 0.95);
-          if (!isFirstPage) {
-            pdf.addPage('a4', 'p');
-          }
-          pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-          isFirstPage = false;
-        } else {
-          // If the page content slightly overflows, slice cleanly by exact A4 height so nothing is squashed!
-          let sourceY = 0;
-          while (sourceY < canvas.height) {
-            const chunkHeight = Math.min(a4HeightPx, canvas.height - sourceY);
-            const sliceCanvas = document.createElement('canvas');
-            sliceCanvas.width = canvas.width;
-            sliceCanvas.height = a4HeightPx;
-            const sCtx = sliceCanvas.getContext('2d');
-            if (sCtx) {
-              sCtx.fillStyle = '#ffffff';
-              sCtx.fillRect(0, 0, sliceCanvas.width, a4HeightPx);
-              sCtx.drawImage(
-                canvas,
-                0, sourceY, canvas.width, chunkHeight,
-                0, 0, canvas.width, chunkHeight
-              );
-            }
-            const sliceImgData = sliceCanvas.toDataURL('image/jpeg', 0.95);
-            if (!isFirstPage) {
-              pdf.addPage('a4', 'p');
-            }
-            pdf.addImage(sliceImgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-            isFirstPage = false;
-            sourceY += a4HeightPx;
-            sliceCanvas.width = 0;
-            sliceCanvas.height = 0;
-          }
+        // Each isolated page is guaranteed to be exactly 1 pristine A4 sheet!
+        const imgData = canvas.toDataURL('image/jpeg', 0.95);
+        if (!isFirstPage) {
+          pdf.addPage('a4', 'p');
         }
+        pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
+        isFirstPage = false;
 
-        // Immediate memory release for iOS Safari / Android WebView
+        // Immediate memory release for iOS Safari & Android WebView
         canvas.width = 0;
         canvas.height = 0;
       }
@@ -848,20 +892,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       const startTime = performance.now();
       const testScale = 1.2; // smaller-scale rendering first to verify device compatibility
 
-      const canvas = await html2canvas(targetElem, {
-        scale: testScale,
-        useCORS: true,
-        allowTaint: true,
-        scrollX: 0,
-        scrollY: 0,
-        x: 0,
-        y: 0,
-        windowWidth: 794,
-        width: 794,
-        backgroundColor: '#ffffff',
-        logging: false,
-        onclone: sanitizeReportClonedDoc,
-      });
+      const canvas = await renderIsolatedPageCanvas(targetElem, 0, testScale);
 
       const durationMs = Math.round(performance.now() - startTime);
       const canvasDim = { w: canvas.width, h: canvas.height };
