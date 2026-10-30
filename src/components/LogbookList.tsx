@@ -581,12 +581,30 @@ export const LogbookList: React.FC<LogbookListProps> = ({
                       </span>
                     </div>
                     {previewPhotoEntry.fotoSebelum ? (
-                      <div className="rounded-xl overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900">
-                        <img
-                          src={previewPhotoEntry.fotoSebelum}
-                          alt="Sebelum"
-                          className="w-full h-full object-contain"
-                        />
+                      <div className="space-y-1.5">
+                        <div className="rounded-xl overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900">
+                          <img
+                            src={previewPhotoEntry.fotoSebelum}
+                            alt="Sebelum"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Hapus Foto Sebelum dari entri kegiatan ini?')) {
+                                const updated = { ...previewPhotoEntry, fotoSebelum: undefined };
+                                onEditEntry(updated);
+                                setPreviewPhotoEntry(updated);
+                              }
+                            }}
+                            className="text-[11px] font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Hapus Foto Sebelum</span>
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="aspect-4/3 rounded-xl border-2 border-dashed border-stone-300 flex items-center justify-center text-xs text-stone-400">
@@ -606,12 +624,30 @@ export const LogbookList: React.FC<LogbookListProps> = ({
                       </span>
                     </div>
                     {previewPhotoEntry.fotoSesudah ? (
-                      <div className="rounded-xl overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900">
-                        <img
-                          src={previewPhotoEntry.fotoSesudah}
-                          alt="Sesudah"
-                          className="w-full h-full object-contain"
-                        />
+                      <div className="space-y-1.5">
+                        <div className="rounded-xl overflow-hidden border border-stone-300 aspect-4/3 bg-stone-900">
+                          <img
+                            src={previewPhotoEntry.fotoSesudah}
+                            alt="Sesudah"
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="flex justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm('Hapus Foto Sesudah dari entri kegiatan ini?')) {
+                                const updated = { ...previewPhotoEntry, fotoSesudah: undefined };
+                                onEditEntry(updated);
+                                setPreviewPhotoEntry(updated);
+                              }
+                            }}
+                            className="text-[11px] font-semibold text-red-600 hover:text-red-800 hover:bg-red-50 px-2 py-1 rounded transition-colors flex items-center gap-1 cursor-pointer"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                            <span>Hapus Foto Sesudah</span>
+                          </button>
+                        </div>
                       </div>
                     ) : (
                       <div className="aspect-4/3 rounded-xl border-2 border-dashed border-stone-300 flex items-center justify-center text-xs text-stone-400">

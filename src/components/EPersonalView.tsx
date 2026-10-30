@@ -10,9 +10,10 @@ import {
   saveEpersonalAutoOpen, 
   getEpersonalUrlWithNip, 
   DEFAULT_USER_PROFILE,
-  mergeCloudNipDirectory
+  mergeCloudNipDirectory,
+  initRosterFromIDB
 } from '../utils/storage';
-import { subscribeToCloudEmployees } from '../firebase';
+import { subscribeToCloudEmployees, fetchCloudEmployees } from '../firebase';
 import { 
   Building2, 
   KeyRound, 
@@ -29,7 +30,8 @@ import {
   X,
   BadgeCheck,
   Check,
-  ArrowRight
+  ArrowRight,
+  RefreshCw
 } from 'lucide-react';
 
 interface EPersonalViewProps {
@@ -49,16 +51,72 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
   const [nipErrorInfo, setNipErrorInfo] = useState<string | null>(null);
   const [justRegisteredOfficer, setJustRegisteredOfficer] = useState<UserProfile | null>(null);
 
-  // Subscribe to shared employee roster from Cloud Firestore
+  const [isRefreshingRoster, setIsRefreshingRoster] = useState(false);
+
+  // Load from IndexedDB and subscribe to shared employee roster & cross-window updates
   useEffect(() => {
+    // 1. Initial async load from IndexedDB (preserves newly registered employees even in PWA standalone mode)
+    initRosterFromIDB().then((idbList) => {
+      if (idbList && idbList.length > 0) {
+        setOfficerDirectory(idbList);
+      }
+    });
+
+    // 2. Fetch directly from Cloud Firestore once
+    fetchCloudEmployees().then((cloudList) => {
+      if (cloudList && cloudList.length > 0) {
+        const merged = mergeCloudNipDirectory(cloudList);
+        setOfficerDirectory(merged);
+      }
+    }).catch(() => {});
+
+    // 3. Realtime Firestore subscription
     const unsub = subscribeToCloudEmployees((cloudList) => {
       if (cloudList && cloudList.length > 0) {
         const merged = mergeCloudNipDirectory(cloudList);
         setOfficerDirectory(merged);
       }
     });
-    return () => unsub();
+
+    // 4. Listen to local custom event triggered by IndexedDB or other tabs
+    const handleDirectoryUpdated = (e: any) => {
+      if (Array.isArray(e.detail) && e.detail.length > 0) {
+        setOfficerDirectory(e.detail);
+      }
+    };
+    window.addEventListener('kps-nip-directory-updated', handleDirectoryUpdated);
+
+    return () => {
+      unsub();
+      window.removeEventListener('kps-nip-directory-updated', handleDirectoryUpdated);
+    };
   }, []);
+
+  const handleRefreshRoster = async () => {
+    setIsRefreshingRoster(true);
+    try {
+      // 1. Load from IndexedDB first
+      const idbList = await initRosterFromIDB();
+      if (idbList.length > 0) {
+        setOfficerDirectory(idbList);
+      }
+
+      // 2. Fetch fresh list from Cloud Firestore
+      const cloudList = await fetchCloudEmployees();
+      if (cloudList && cloudList.length > 0) {
+        const merged = mergeCloudNipDirectory(cloudList);
+        setOfficerDirectory(merged);
+        displayToast(`Direktori NIP disinkronkan (${merged.length} karyawan terdaftar)!`);
+      } else {
+        displayToast(`Direktori NIP dimuat ulang (${idbList.length} karyawan terdaftar).`);
+      }
+    } catch (err: any) {
+      console.warn('Refresh roster error:', err);
+      displayToast('Gagal memuat dari Cloud, menggunakan data lokal.');
+    } finally {
+      setIsRefreshingRoster(false);
+    }
+  };
 
   // E-Personal Settings
   const [autoOpenEpersonal, setAutoOpenEpersonal] = useState<boolean>(() => loadEpersonalAutoOpen());
@@ -447,19 +505,32 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
             </span>
           </div>
 
-          {/* Register New Officer Button */}
-          <button
-            type="button"
-            onClick={() => {
-              setNewEmpError(null);
-              setIsRegisterModalOpen(true);
-            }}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-800/90 hover:bg-emerald-700 text-white text-xs font-bold transition-all border border-emerald-500/50 shadow-sm cursor-pointer self-start sm:self-auto"
-            title="Daftarkan rekan kerja karyawan KPS 1 Manoko ke dalam sistem"
-          >
-            <PlusCircle className="w-4 h-4 text-amber-300" />
-            <span>+ Daftarkan Karyawan Baru</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={handleRefreshRoster}
+              disabled={isRefreshingRoster}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-800/90 hover:bg-stone-700 text-stone-200 text-xs font-semibold transition-all border border-stone-700 shadow-sm cursor-pointer disabled:opacity-50"
+              title="Perbarui daftar karyawan dari memori lokal dan Cloud"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshingRoster ? 'animate-spin' : ''}`} />
+              <span>{isRefreshingRoster ? 'Memperbarui...' : 'Sinkron NIP'}</span>
+            </button>
+
+            {/* Register New Officer Button */}
+            <button
+              type="button"
+              onClick={() => {
+                setNewEmpError(null);
+                setIsRegisterModalOpen(true);
+              }}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-800/90 hover:bg-emerald-700 text-white text-xs font-bold transition-all border border-emerald-500/50 shadow-sm cursor-pointer"
+              title="Daftarkan rekan kerja karyawan KPS 1 Manoko ke dalam sistem"
+            >
+              <PlusCircle className="w-4 h-4 text-amber-300" />
+              <span>+ Daftarkan Karyawan Baru</span>
+            </button>
+          </div>
         </div>
 
         {/* Dedicated banner when employee was just registered: shows saved confirmation without auto-redirecting */}

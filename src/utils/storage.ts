@@ -1,5 +1,11 @@
 import { LogbookEntry, UserProfile, GoogleAccount } from '../types/logbook';
-import { saveEntriesToIDB } from './idbStorage';
+import { 
+  saveEntriesToIDB, 
+  saveOfficersToIDB, 
+  getOfficersFromIDB, 
+  saveSingleOfficerToIDB, 
+  deleteOfficerFromIDB 
+} from './idbStorage';
 import { syncEmployeeToCloud, deleteEmployeeFromCloud } from '../firebase';
 
 const LOGBOOK_STORAGE_KEY = 'kps1_manoko_logbook_entries_v1';
@@ -458,12 +464,59 @@ export function loadNipDirectory(): UserProfile[] {
   }
 }
 
+// Cross-tab and PWA Standalone Synchronization Channel
+const rosterBroadcast = typeof window !== 'undefined' && 'BroadcastChannel' in window 
+  ? new BroadcastChannel('kps_nip_roster_channel') 
+  : null;
+
+if (rosterBroadcast) {
+  rosterBroadcast.onmessage = (event) => {
+    if (event.data?.type === 'ROSTER_UPDATED' && Array.isArray(event.data?.roster)) {
+      try {
+        localStorage.setItem(NIP_DIRECTORY_STORAGE_KEY, JSON.stringify(event.data.roster));
+        window.dispatchEvent(new CustomEvent('kps-nip-directory-updated', { detail: event.data.roster }));
+      } catch {}
+    }
+  };
+}
+
 export function saveNipDirectory(directory: UserProfile[]): void {
   try {
     localStorage.setItem(NIP_DIRECTORY_STORAGE_KEY, JSON.stringify(directory));
   } catch (err) {
-    console.error('Error saving NIP directory:', err);
+    console.error('Error saving NIP directory to localStorage:', err);
   }
+
+  // 1. Persist to high-capacity IndexedDB so PWA standalone mode and new sessions never lose registered employees
+  saveOfficersToIDB(directory).catch((err) => {
+    console.warn('IDB saveOfficers warning:', err);
+  });
+
+  // 2. Broadcast to other open windows / standalone PWA instances
+  try {
+    rosterBroadcast?.postMessage({ type: 'ROSTER_UPDATED', roster: directory });
+  } catch {}
+
+  // 3. Dispatch local event for instant reactive UI re-render
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('kps-nip-directory-updated', { detail: directory }));
+  }
+}
+
+/**
+ * Initializes and synchronizes NIP directory from IndexedDB on startup.
+ * Fixes PWA Standalone mode where localStorage might be blank on initial launch.
+ */
+export async function initRosterFromIDB(): Promise<UserProfile[]> {
+  try {
+    const idbOfficers = await getOfficersFromIDB();
+    if (idbOfficers && idbOfficers.length > 0) {
+      return mergeCloudNipDirectory(idbOfficers);
+    }
+  } catch (err) {
+    console.warn('initRosterFromIDB warning:', err);
+  }
+  return loadNipDirectory();
 }
 
 /**
@@ -536,7 +589,11 @@ export function saveProfileToNipDirectory(profile: UserProfile): void {
     updated = [profile, ...directory];
   }
 
+  // Save to both LocalStorage, IndexedDB, and notify all windows
   saveNipDirectory(updated);
+  saveSingleOfficerToIDB(profile).catch((err) => {
+    console.warn('IDB saveSingleOfficer warning:', err);
+  });
 
   // Sync to Cloud Firestore so colleagues and new devices get this employee immediately!
   syncEmployeeToCloud(profile).catch((err) => {
@@ -552,6 +609,10 @@ export function deleteProfileFromNipDirectory(nipInput: string): UserProfile[] {
   // Don't delete Riki Subagja as he is default personnel
   const updated = directory.filter((item) => cleanNipDigits(item.nip) !== cleanInput || cleanInput === cleanNipDigits(DEFAULT_USER_PROFILE.nip));
   saveNipDirectory(updated);
+
+  deleteOfficerFromIDB(cleanInput).catch((err) => {
+    console.warn('IDB deleteOfficer warning:', err);
+  });
 
   // Delete from Cloud Firestore
   deleteEmployeeFromCloud(cleanInput).catch((err) => {

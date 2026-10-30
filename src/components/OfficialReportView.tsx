@@ -36,12 +36,17 @@ import {
   AlertCircle,
   X,
   Download,
-  RefreshCw
+  RefreshCw,
+  Check,
+  CheckSquare,
+  Square,
+  Filter
 } from 'lucide-react';
 
 interface OfficialReportViewProps {
   entries: LogbookEntry[];
   profile: UserProfile;
+  onUpdateEntry?: (entry: LogbookEntry) => void;
 }
 
 const MONTH_NAMES = [
@@ -154,7 +159,7 @@ function formatIndonesianDate(dateStr: string): string {
   }
 }
 
-export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile }) => {
+export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile, onUpdateEntry }) => {
   // Dynamic initialization based on latest entry or current date
   const [reportConfig, setReportConfig] = useState<ReportConfig>(() => {
     let targetDate = new Date();
@@ -201,6 +206,16 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   const [customWaktuPelaksanaan, setCustomWaktuPelaksanaan] = useState<string>('');
   const [customPenutup, setCustomPenutup] = useState<string>('');
   const [hasCustomEdits, setHasCustomEdits] = useState(false);
+
+  // Photo Curation & Deletion State
+  const [photoToDelete, setPhotoToDelete] = useState<{ index: number; item: ReportPhotoItem } | null>(null);
+  const [isPhotoCuratorOpen, setIsPhotoCuratorOpen] = useState(false);
+  const [photoActionToast, setPhotoActionToast] = useState<string | null>(null);
+
+  const displayPhotoToast = (msg: string) => {
+    setPhotoActionToast(msg);
+    setTimeout(() => setPhotoActionToast(null), 3500);
+  };
 
   const reportContainerRef = useRef<HTMLDivElement | null>(null);
   const newPhotoInputRef = useRef<HTMLInputElement | null>(null);
@@ -419,16 +434,30 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       }));
   }, [filteredEntries]);
 
+  // Period tracker to prevent custom photo deletions from being wiped unexpectedly
+  const periodKey = `${reportConfig.tipe}-${reportConfig.tahun}-${reportConfig.bulan}-${reportConfig.triwulan}`;
+  const prevPeriodKeyRef = useRef(periodKey);
+
   // Sync state whenever period or filtered entries change
   useEffect(() => {
-    setCustomTable1(defaultTable1Data);
-    setCustomPhotos(defaultPhotos);
-    setCustomLatarBelakang(defaultLatarBelakang);
-    setCustomTujuan(defaultTujuan);
-    setCustomWaktuPelaksanaan(defaultWaktuPelaksanaan);
-    setCustomPenutup(defaultPenutup);
-    setHasCustomEdits(false);
-  }, [defaultTable1Data, defaultPhotos, defaultLatarBelakang, defaultTujuan, defaultWaktuPelaksanaan, defaultPenutup]);
+    if (prevPeriodKeyRef.current !== periodKey) {
+      prevPeriodKeyRef.current = periodKey;
+      setCustomTable1(defaultTable1Data);
+      setCustomPhotos(defaultPhotos);
+      setCustomLatarBelakang(defaultLatarBelakang);
+      setCustomTujuan(defaultTujuan);
+      setCustomWaktuPelaksanaan(defaultWaktuPelaksanaan);
+      setCustomPenutup(defaultPenutup);
+      setHasCustomEdits(false);
+    } else if (!hasCustomEdits) {
+      setCustomTable1(defaultTable1Data);
+      setCustomPhotos(defaultPhotos);
+      setCustomLatarBelakang(defaultLatarBelakang);
+      setCustomTujuan(defaultTujuan);
+      setCustomWaktuPelaksanaan(defaultWaktuPelaksanaan);
+      setCustomPenutup(defaultPenutup);
+    }
+  }, [periodKey, defaultTable1Data, defaultPhotos, defaultLatarBelakang, defaultTujuan, defaultWaktuPelaksanaan, defaultPenutup, hasCustomEdits]);
 
   // Image replacement handler for a specific row in Tabel 2
   const handleReplacePhoto = async (index: number, file: File) => {
@@ -443,6 +472,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         return copy;
       });
       setHasCustomEdits(true);
+      displayPhotoToast('Foto berhasil diganti.');
     } catch (err: any) {
       alert('Gagal memproses gambar baru: ' + err.message);
     }
@@ -464,14 +494,71 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       };
       setCustomPhotos((prev) => [...prev, newPhotoItem]);
       setHasCustomEdits(true);
+      displayPhotoToast('Foto dokumentasi baru berhasil ditambahkan.');
     } catch (err: any) {
       alert('Gagal mengunggah foto baru: ' + err.message);
     }
   };
 
-  // Remove a photo row
+  // Remove a photo row directly
   const handleDeletePhotoRow = (index: number) => {
     setCustomPhotos((prev) => prev.filter((_, idx) => idx !== index));
+    setHasCustomEdits(true);
+    displayPhotoToast('Foto berhasil dihapus dari tabel laporan.');
+  };
+
+  // Confirm delete from report only
+  const handleConfirmDeletePhotoFromReport = () => {
+    if (!photoToDelete) return;
+    const targetIdx = photoToDelete.index;
+    setCustomPhotos((prev) => prev.filter((_, idx) => idx !== targetIdx));
+    setHasCustomEdits(true);
+    displayPhotoToast('Foto berhasil dihapus dari laporan resmi.');
+    setPhotoToDelete(null);
+  };
+
+  // Confirm delete from report AND permanently from logbook
+  const handleConfirmDeletePhotoPermanent = () => {
+    if (!photoToDelete) return;
+    const targetIdx = photoToDelete.index;
+    const photoItem = photoToDelete.item;
+
+    // 1. Remove from report
+    setCustomPhotos((prev) => prev.filter((_, idx) => idx !== targetIdx));
+    setHasCustomEdits(true);
+
+    // 2. Remove permanently from entry in logbook database if onUpdateEntry exists
+    if (photoItem.id && onUpdateEntry) {
+      const matched = entries.find((e) => e.id === photoItem.id);
+      if (matched) {
+        const updatedEntry: LogbookEntry = {
+          ...matched,
+          fotoSebelum: undefined,
+          updatedAt: new Date().toISOString(),
+        };
+        onUpdateEntry(updatedEntry);
+      }
+    }
+
+    displayPhotoToast('Foto dihapus dari laporan & dihapus permanen dari logbook.');
+    setPhotoToDelete(null);
+  };
+
+  // Restore all original photos from logbook for this period
+  const handleRestoreAllOriginalPhotos = () => {
+    setCustomPhotos(defaultPhotos);
+    setHasCustomEdits(true);
+    displayPhotoToast(`Semua foto dokumentasi asli (${defaultPhotos.length} foto) dipulihkan ke laporan.`);
+  };
+
+  // Toggle photo inclusion in report
+  const handleTogglePhotoInReport = (item: ReportPhotoItem) => {
+    const isCurrentlyIncluded = customPhotos.some((p) => p.id === item.id || p.foto === item.foto);
+    if (isCurrentlyIncluded) {
+      setCustomPhotos((prev) => prev.filter((p) => p.id !== item.id && p.foto !== item.foto));
+    } else {
+      setCustomPhotos((prev) => [...prev, item]);
+    }
     setHasCustomEdits(true);
   };
 
@@ -1584,27 +1671,61 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                 </div>
                 <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
                   <div className="space-y-4">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div>
-                        <h4 className="font-bold text-[12pt] text-stone-900">
-                          {pageIdx === 0
-                            ? 'Tabel 2. Dokumentasi Kegiatan'
-                            : 'Tabel 2. Dokumentasi Kegiatan (Lanjutan)'}
-                        </h4>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-bold text-[12pt] text-stone-900">
+                            {pageIdx === 0
+                              ? 'Tabel 2. Dokumentasi Kegiatan'
+                              : 'Tabel 2. Dokumentasi Kegiatan (Lanjutan)'}
+                          </h4>
+                          <span className="no-print text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full border border-emerald-300">
+                            {customPhotos.length} Foto Tercantum
+                          </span>
+                          {customPhotos.length < defaultPhotos.length && (
+                            <span className="no-print text-[10px] bg-amber-100 text-amber-800 font-semibold px-2 py-0.5 rounded-full border border-amber-300">
+                              {defaultPhotos.length - customPhotos.length} Foto Dikecualikan
+                            </span>
+                          )}
+                        </div>
                         <p className="text-[11pt] text-stone-500 italic mt-0.5">
                           Foto kegiatan operasional kebun KPS PVT I Manoko ({periodText})
                         </p>
                       </div>
 
                       {pageIdx === 0 && (
-                        <button
-                          type="button"
-                          onClick={triggerAddNewPhoto}
-                          className="no-print cursor-pointer px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                          <span>Tambah Baris Foto Baru</span>
-                        </button>
+                        <div className="no-print flex items-center gap-1.5 flex-wrap">
+                          {customPhotos.length < defaultPhotos.length && (
+                            <button
+                              type="button"
+                              onClick={handleRestoreAllOriginalPhotos}
+                              className="cursor-pointer px-2.5 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 rounded-lg text-xs font-semibold flex items-center gap-1 border border-amber-300 shadow-2xs transition-colors"
+                              title="Kembalikan semua foto asli dari logbook kegiatan ke dalam laporan"
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-amber-700" />
+                              <span>Pulihkan Foto Asli ({defaultPhotos.length})</span>
+                            </button>
+                          )}
+
+                          <button
+                            type="button"
+                            onClick={() => setIsPhotoCuratorOpen(true)}
+                            className="cursor-pointer px-3 py-1.5 bg-stone-100 hover:bg-stone-200 text-stone-800 rounded-lg text-xs font-semibold flex items-center gap-1.5 border border-stone-300 shadow-2xs transition-colors"
+                            title="Pilih dan centang foto mana saja yang ingin disertakan ke laporan resmi"
+                          >
+                            <Filter className="w-3.5 h-3.5 text-emerald-700" />
+                            <span>Pilih / Kurasi Foto</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={triggerAddNewPhoto}
+                            className="no-print cursor-pointer px-3.5 py-1.5 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors shrink-0"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>Tambah Baris Foto Baru</span>
+                          </button>
+                        </div>
                       )}
                     </div>
 
@@ -1634,37 +1755,48 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                     />
 
                                     {/* Direct image edit buttons on hover */}
-                                    <div className="no-print absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                                    <div className="no-print absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2 p-2">
                                       <button
                                         type="button"
                                         onClick={() => triggerReplacePhoto(actualIdx)}
                                         className="cursor-pointer bg-white text-stone-900 px-2.5 py-1.5 rounded-md text-xs font-semibold hover:bg-stone-100 transition-colors shadow-xs flex items-center gap-1"
                                       >
                                         <ImageIcon className="w-3.5 h-3.5 text-emerald-700" />
-                                        <span>Ganti Foto</span>
+                                        <span>Ganti</span>
+                                      </button>
+                                      <button
+                                        type="button"
+                                        onClick={() => setPhotoToDelete({ index: actualIdx, item: doc })}
+                                        className="cursor-pointer bg-red-600 hover:bg-red-700 text-white px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors shadow-xs flex items-center gap-1"
+                                        title="Hapus foto ini dari laporan resmi"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                        <span>Hapus</span>
                                       </button>
                                     </div>
                                   </div>
 
-                                  {/* Additional edit controls visible in edit mode or direct */}
-                                  <div className="no-print mt-2 flex items-center justify-center gap-2">
+                                  {/* Dedicated action buttons permanently visible under photo */}
+                                  <div className="no-print mt-2 flex items-center justify-center gap-2 flex-wrap">
                                     <button
                                       type="button"
                                       onClick={() => triggerReplacePhoto(actualIdx)}
-                                      className="cursor-pointer text-[11px] font-semibold text-emerald-800 hover:text-emerald-900 bg-emerald-50 px-2 py-1 rounded border border-emerald-200"
+                                      className="cursor-pointer text-[11px] font-semibold text-emerald-800 hover:text-emerald-950 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-md border border-emerald-200 transition-colors flex items-center gap-1"
+                                      title="Ganti foto dokumentasi baris ini"
                                     >
-                                      Ganti Foto
+                                      <ImageIcon className="w-3 h-3 text-emerald-700" />
+                                      <span>Ganti Foto</span>
                                     </button>
-                                    {isEditMode && (
-                                      <button
-                                        type="button"
-                                        onClick={() => handleDeletePhotoRow(actualIdx)}
-                                        className="text-[11px] font-semibold text-red-700 hover:text-red-900 bg-red-50 px-2 py-1 rounded border border-red-200 flex items-center gap-1 cursor-pointer"
-                                      >
-                                        <Trash2 className="w-3 h-3" />
-                                        <span>Hapus</span>
-                                      </button>
-                                    )}
+
+                                    <button
+                                      type="button"
+                                      onClick={() => setPhotoToDelete({ index: actualIdx, item: doc })}
+                                      className="cursor-pointer text-[11px] font-bold text-red-700 hover:text-white bg-red-50 hover:bg-red-700 px-2.5 py-1 rounded-md border border-red-300 transition-all flex items-center gap-1 shadow-2xs active:scale-95"
+                                      title="Keluarkan foto ini dari tabel laporan resmi"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                      <span>Hapus Foto</span>
+                                    </button>
                                   </div>
                                 </td>
 
@@ -2019,6 +2151,261 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               >
                 Tutup jendela ini
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== FLOATING TOAST: AKSI FOTO DOKUMENTASI ==================== */}
+      {photoActionToast && (
+        <div className="fixed bottom-6 right-6 z-50 bg-stone-900 text-white px-4 py-2.5 rounded-xl shadow-2xl flex items-center gap-2.5 animate-fade-in border border-emerald-500/40 no-print">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span className="text-xs font-semibold">{photoActionToast}</span>
+        </div>
+      )}
+
+      {/* ==================== MODAL 3: KONFIRMASI HAPUS FOTO DARI TABEL DOKUMENTASI ==================== */}
+      {photoToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in no-print">
+          <div className="bg-white rounded-2xl max-w-md w-full shadow-2xl border border-stone-200 overflow-hidden text-stone-900">
+            <div className="h-1.5 w-full bg-gradient-to-r from-red-600 via-rose-500 to-amber-600"></div>
+            
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2.5 text-red-600">
+                  <div className="p-2 rounded-xl bg-red-100 shrink-0">
+                    <Trash2 className="w-5 h-5 text-red-600" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-stone-900 leading-tight">
+                      Hapus Foto Dokumentasi?
+                    </h3>
+                    <p className="text-xs text-stone-500">
+                      Tabel 2. Dokumentasi Kegiatan ({periodText})
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setPhotoToDelete(null)}
+                  className="p-1 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Photo Preview Thumbnail */}
+              <div className="p-3 bg-stone-50 rounded-xl border border-stone-200 flex items-center gap-3">
+                <div className="w-20 h-16 rounded-lg overflow-hidden bg-stone-900 border border-stone-300 shrink-0 flex items-center justify-center">
+                  <img
+                    src={photoToDelete.item.foto}
+                    alt="Preview hapus foto"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="min-w-0 flex-1 text-xs space-y-0.5">
+                  <p className="font-semibold text-stone-900 truncate">
+                    {photoToDelete.item.keterangan || 'Dokumentasi kegiatan'}
+                  </p>
+                  {photoToDelete.item.tanggal && (
+                    <p className="text-[11px] text-stone-500 font-mono">
+                      Tanggal: {formatIndonesianDate(photoToDelete.item.tanggal)}
+                    </p>
+                  )}
+                  {photoToDelete.item.lokasi && (
+                    <p className="text-[11px] text-stone-500 truncate">
+                      Lokasi: {photoToDelete.item.lokasi}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-xs text-stone-600 leading-relaxed">
+                Pilih bagaimana Anda ingin menghapus foto dokumentasi ini:
+              </p>
+
+              <div className="space-y-2 pt-1">
+                {/* Option 1: Hapus dari Laporan Resmi Saja (Recommended) */}
+                <button
+                  type="button"
+                  onClick={handleConfirmDeletePhotoFromReport}
+                  className="w-full p-3 rounded-xl border-2 border-emerald-500/40 bg-emerald-50/50 hover:bg-emerald-100/70 text-left transition-all cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-950 flex items-center gap-1.5">
+                      <span>✓ Hapus dari Laporan Resmi Saja</span>
+                      <span className="text-[10px] bg-emerald-600 text-white px-1.5 py-0.2 rounded font-semibold">Rekomendasi</span>
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-800/90 mt-1 leading-snug">
+                    Foto tidak akan dicantumkan di cetakan PDF/Word resmi, namun tetap aman tersimpan di riwayat harian logbook Anda.
+                  </p>
+                </button>
+
+                {/* Option 2: Hapus Permanen dari Logbook */}
+                {onUpdateEntry && photoToDelete.item.id && (
+                  <button
+                    type="button"
+                    onClick={handleConfirmDeletePhotoPermanent}
+                    className="w-full p-3 rounded-xl border border-red-200 bg-red-50/50 hover:bg-red-100/70 text-left transition-all cursor-pointer group"
+                  >
+                    <span className="text-xs font-bold text-red-900 block">
+                      🗑️ Hapus Permanen dari Laporan &amp; Logbook
+                    </span>
+                    <p className="text-[11px] text-red-700/90 mt-1 leading-snug">
+                      Hapus foto dari laporan resmi sekaligus hapus berkas foto dari catatan logbook database.
+                    </p>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex justify-end pt-2 border-t border-stone-200">
+                <button
+                  type="button"
+                  onClick={() => setPhotoToDelete(null)}
+                  className="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-800 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
+                >
+                  Batal
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== MODAL 4: KURASI & PEMILIHAN FOTO DOKUMENTASI LAPORAN ==================== */}
+      {isPhotoCuratorOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-fade-in no-print overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-2xl w-full shadow-2xl border border-stone-200 overflow-hidden text-stone-900 my-8">
+            <div className="h-1.5 w-full bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-700"></div>
+
+            <div className="p-5 sm:p-6 space-y-4">
+              <div className="flex items-start justify-between border-b border-stone-200 pb-3">
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Filter className="w-5 h-5 text-emerald-700" />
+                    <h3 className="text-base font-bold text-stone-900">
+                      Pilih Foto Dokumentasi Laporan Resmi
+                    </h3>
+                  </div>
+                  <p className="text-xs text-stone-500 mt-0.5">
+                    Centang foto-foto yang ingin disertakan ke dalam laporan resmi ({periodText}). Foto yang tidak dicentang otomatis dikeluarkan dari cetakan.
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsPhotoCuratorOpen(false)}
+                  className="p-1.5 rounded-lg text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Summary Bar */}
+              <div className="flex items-center justify-between bg-stone-50 p-3 rounded-xl border border-stone-200 text-xs">
+                <span className="font-semibold text-stone-700">
+                  {customPhotos.length} dari {defaultPhotos.length} foto terpilih untuk laporan resmi
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomPhotos(defaultPhotos);
+                      setHasCustomEdits(true);
+                    }}
+                    className="text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline cursor-pointer"
+                  >
+                    Pilih Semua ({defaultPhotos.length})
+                  </button>
+                  <span className="text-stone-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setCustomPhotos([]);
+                      setHasCustomEdits(true);
+                    }}
+                    className="text-[11px] font-bold text-red-600 hover:text-red-800 underline cursor-pointer"
+                  >
+                    Kosongkan Semua
+                  </button>
+                </div>
+              </div>
+
+              {/* Photo Checklist Grid */}
+              <div className="max-h-[380px] overflow-y-auto space-y-2 pr-1">
+                {defaultPhotos.length === 0 ? (
+                  <p className="text-center py-8 text-xs text-stone-500">
+                    Tidak ada dokumentasi foto untuk periode ini.
+                  </p>
+                ) : (
+                  defaultPhotos.map((item, idx) => {
+                    const isSelected = customPhotos.some((p) => p.id === item.id || p.foto === item.foto);
+
+                    return (
+                      <div
+                        key={item.id || idx}
+                        onClick={() => handleTogglePhotoInReport(item)}
+                        className={`flex items-center gap-3 p-3 rounded-xl border transition-all cursor-pointer select-none ${
+                          isSelected
+                            ? 'bg-emerald-50/70 border-emerald-400 shadow-2xs'
+                            : 'bg-stone-50 border-stone-200 opacity-60 hover:opacity-100'
+                        }`}
+                      >
+                        <div className="text-emerald-700 shrink-0">
+                          {isSelected ? (
+                            <CheckSquare className="w-5 h-5 text-emerald-700" />
+                          ) : (
+                            <Square className="w-5 h-5 text-stone-400" />
+                          )}
+                        </div>
+
+                        <div className="w-16 h-12 rounded-lg overflow-hidden bg-stone-900 border border-stone-300 shrink-0 flex items-center justify-center">
+                          <img
+                            src={item.foto}
+                            alt={`Preview foto ${idx + 1}`}
+                            className="w-full h-full object-cover"
+                          />
+                        </div>
+
+                        <div className="min-w-0 flex-1 text-xs">
+                          <p className="font-semibold text-stone-900 truncate">
+                            {idx + 1}. {item.keterangan || 'Dokumentasi kegiatan'}
+                          </p>
+                          <div className="flex items-center gap-3 text-[11px] text-stone-500 mt-0.5">
+                            {item.tanggal && <span>Tgl: {formatIndonesianDate(item.tanggal)}</span>}
+                            {item.lokasi && <span>Lokasi: {item.lokasi}</span>}
+                          </div>
+                        </div>
+
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                          isSelected ? 'bg-emerald-600 text-white' : 'bg-stone-200 text-stone-600'
+                        }`}>
+                          {isSelected ? 'Masuk Laporan' : 'Dikecualikan'}
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="flex items-center justify-between pt-3 border-t border-stone-200">
+                <span className="text-[11px] text-stone-500">
+                  Tabel 2 akan otomatis menyesuaikan (2 foto per halaman A4).
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsPhotoCuratorOpen(false);
+                    displayPhotoToast(`Tabel dokumentasi diperbarui (${customPhotos.length} foto).`);
+                  }}
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-600 rounded-xl shadow-md transition-all cursor-pointer"
+                >
+                  Selesai Memilih
+                </button>
+              </div>
             </div>
           </div>
         </div>

@@ -1,5 +1,8 @@
 import { initializeApp } from 'firebase/app';
 import { 
+  initializeFirestore,
+  persistentLocalCache,
+  persistentMultipleTabManager,
   getFirestore, 
   doc, 
   getDocFromServer, 
@@ -29,10 +32,25 @@ import { LogbookEntry, UserProfile } from './types/logbook';
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
 
-// Initialize Firestore (pass custom databaseId if configured)
-export const db = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
-  : getFirestore(app);
+// Initialize Firestore with IndexedDB persistent local cache and ignoreUndefinedProperties
+function initFirestoreInstance() {
+  const dbId = firebaseConfig.firestoreDatabaseId && firebaseConfig.firestoreDatabaseId !== '(default)'
+    ? firebaseConfig.firestoreDatabaseId
+    : undefined;
+
+  try {
+    return initializeFirestore(app, {
+      ignoreUndefinedProperties: true,
+      localCache: persistentLocalCache({
+        tabManager: persistentMultipleTabManager()
+      })
+    }, dbId);
+  } catch {
+    return dbId ? getFirestore(app, dbId) : getFirestore(app);
+  }
+}
+
+export const db = initFirestoreInstance();
 
 // Suppress repetitive background connection retry noise while operating in local offline cache mode
 setLogLevel('silent');

@@ -11,7 +11,8 @@ import {
   sortLogbookEntriesByDateAscending,
   saveGoogleAccount,
   clearGoogleAccount,
-  mergeCloudNipDirectory
+  mergeCloudNipDirectory,
+  initRosterFromIDB
 } from './utils/storage';
 import { 
   auth, 
@@ -21,6 +22,7 @@ import {
   syncProfileToCloud, 
   batchSyncEntriesToCloud,
   subscribeToCloudEmployees,
+  fetchCloudEmployees,
   handleGoogleRedirectResult
 } from './firebase';
 import { 
@@ -76,14 +78,22 @@ export default function App() {
       }
     });
 
-    // 1. Subscribe to shared employee roster so registered colleagues appear on all devices
+    // 1. Initial async load from IndexedDB and Cloud Firestore for shared employee roster
+    initRosterFromIDB().catch(() => {});
+    fetchCloudEmployees().then((cloudEmps) => {
+      if (cloudEmps && cloudEmps.length > 0) {
+        mergeCloudNipDirectory(cloudEmps);
+      }
+    }).catch(() => {});
+
+    // 2. Realtime subscribe to shared employee roster so registered colleagues appear on all devices
     const unsubscribeEmployees = subscribeToCloudEmployees((cloudEmps) => {
       if (cloudEmps && cloudEmps.length > 0) {
         mergeCloudNipDirectory(cloudEmps);
       }
     });
 
-    // 2. Load all entries from high-capacity IndexedDB to ensure daily entries are never lost
+    // 3. Load all entries from high-capacity IndexedDB to ensure daily entries are never lost
     getAllEntriesFromIDB().then((idbEntries) => {
       if (idbEntries && idbEntries.length > 0) {
         setEntries((prev) => {
@@ -301,6 +311,7 @@ export default function App() {
           <OfficialReportView
             entries={entries}
             profile={profile}
+            onUpdateEntry={handleSaveEntry}
           />
         )}
 
