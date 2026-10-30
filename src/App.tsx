@@ -10,7 +10,8 @@ import {
   saveUserProfile,
   sortLogbookEntriesByDateAscending,
   saveGoogleAccount,
-  clearGoogleAccount
+  clearGoogleAccount,
+  mergeCloudNipDirectory
 } from './utils/storage';
 import { 
   auth, 
@@ -18,8 +19,15 @@ import {
   syncEntryToCloud, 
   deleteEntryFromCloud, 
   syncProfileToCloud, 
-  batchSyncEntriesToCloud 
+  batchSyncEntriesToCloud,
+  subscribeToCloudEmployees,
+  handleGoogleRedirectResult
 } from './firebase';
+import { 
+  getAllEntriesFromIDB, 
+  saveSingleEntryToIDB, 
+  deleteEntryFromIDB 
+} from './utils/idbStorage';
 import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
 import { collection, doc, onSnapshot } from 'firebase/firestore';
 import { Header } from './components/Header';
@@ -44,8 +52,14 @@ export default function App() {
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialSyncRef = useRef(false);
 
-  // Monitor Authentication State
+  // Monitor Authentication State & Check Redirect Result
   useEffect(() => {
+    handleGoogleRedirectResult().then((user) => {
+      if (user) {
+        setCurrentUser(user);
+      }
+    });
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
       setCurrentUser(user);
       if (user) {
@@ -62,7 +76,29 @@ export default function App() {
       }
     });
 
-    return () => unsubscribeAuth();
+    // 1. Subscribe to shared employee roster so registered colleagues appear on all devices
+    const unsubscribeEmployees = subscribeToCloudEmployees((cloudEmps) => {
+      if (cloudEmps && cloudEmps.length > 0) {
+        mergeCloudNipDirectory(cloudEmps);
+      }
+    });
+
+    // 2. Load all entries from high-capacity IndexedDB to ensure daily entries are never lost
+    getAllEntriesFromIDB().then((idbEntries) => {
+      if (idbEntries && idbEntries.length > 0) {
+        setEntries((prev) => {
+          if (idbEntries.length >= prev.length) {
+            return sortLogbookEntriesByDateAscending(idbEntries);
+          }
+          return prev;
+        });
+      }
+    }).catch((err) => console.warn('IDB load warning:', err));
+
+    return () => {
+      unsubscribeAuth();
+      unsubscribeEmployees();
+    };
   }, []);
 
   // Listen to Firestore Realtime Data when user is logged in
@@ -138,6 +174,11 @@ export default function App() {
       return sorted;
     });
 
+    // Save to high-capacity IndexedDB
+    saveSingleEntryToIDB(newOrUpdatedEntry).catch((err) => {
+      console.warn('IDB single save warning:', err);
+    });
+
     // Sync to Firestore Cloud immediately if logged in
     if (currentUser) {
       syncEntryToCloud(currentUser.uid, newOrUpdatedEntry);
@@ -151,6 +192,11 @@ export default function App() {
       const updated = prev.filter((e) => e.id !== id);
       saveLogbookEntries(updated);
       return updated;
+    });
+
+    // Delete from IndexedDB
+    deleteEntryFromIDB(id).catch((err) => {
+      console.warn('IDB single delete warning:', err);
     });
 
     // Delete from Firestore Cloud immediately if logged in

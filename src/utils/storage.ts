@@ -1,4 +1,6 @@
 import { LogbookEntry, UserProfile, GoogleAccount } from '../types/logbook';
+import { saveEntriesToIDB } from './idbStorage';
+import { syncEmployeeToCloud, deleteEmployeeFromCloud } from '../firebase';
 
 const LOGBOOK_STORAGE_KEY = 'kps1_manoko_logbook_entries_v1';
 const PROFILE_STORAGE_KEY = 'kps1_manoko_user_profile_v1';
@@ -353,11 +355,37 @@ export function loadLogbookEntries(): LogbookEntry[] {
 }
 
 export function saveLogbookEntries(entries: LogbookEntry[]): void {
+  const sorted = sortLogbookEntriesByDateAscending(entries);
+
+  // 1. Always save complete records with all photos into high-capacity IndexedDB (GBs available)
+  saveEntriesToIDB(sorted).catch((idbErr) => {
+    console.warn('IDB save warning:', idbErr);
+  });
+
+  // 2. Save to localStorage for instant synchronous offline boot
   try {
-    const sorted = sortLogbookEntriesByDateAscending(entries);
     localStorage.setItem(LOGBOOK_STORAGE_KEY, JSON.stringify(sorted));
   } catch (err) {
-    console.error('Error saving logbook entries:', err);
+    console.warn('LocalStorage quota exceeded, optimizing storage payload:', err);
+    // If browser localStorage hits 5MB quota, retain full text metadata in localStorage
+    // while photos remain 100% intact in IndexedDB
+    try {
+      const lightweight = sorted.map((e, idx) => {
+        // Keep photos for latest 8 entries in localStorage, older entries load photos from IndexedDB
+        if (idx >= sorted.length - 8) {
+          return e;
+        }
+        return {
+          ...e,
+          // If large base64, omit from localStorage payload (it's safe in IndexedDB)
+          fotoSebelum: e.fotoSebelum && e.fotoSebelum.length > 5000 ? undefined : e.fotoSebelum,
+          fotoSesudah: e.fotoSesudah && e.fotoSesudah.length > 5000 ? undefined : e.fotoSesudah,
+        };
+      });
+      localStorage.setItem(LOGBOOK_STORAGE_KEY, JSON.stringify(lightweight));
+    } catch (fallbackErr) {
+      console.warn('LocalStorage fallback save error (IndexedDB safe):', fallbackErr);
+    }
   }
 }
 
@@ -438,6 +466,52 @@ export function saveNipDirectory(directory: UserProfile[]): void {
   }
 }
 
+/**
+ * Merges employees retrieved from Cloud Firestore into the local directory.
+ * Ensures any registered employee is visible on all devices and shared app links!
+ */
+export function mergeCloudNipDirectory(cloudOfficers: UserProfile[]): UserProfile[] {
+  if (!cloudOfficers || cloudOfficers.length === 0) return loadNipDirectory();
+
+  const currentLocal = loadNipDirectory();
+  const mergedMap = new Map<string, UserProfile>();
+
+  // Put local first
+  currentLocal.forEach((officer) => {
+    const clean = cleanNipDigits(officer.nip);
+    if (clean) mergedMap.set(clean, officer);
+  });
+
+  // Merge cloud officers
+  cloudOfficers.forEach((cloudEmp) => {
+    const clean = cleanNipDigits(cloudEmp.nip);
+    if (!clean || LEGACY_MOCK_NIPS.has(clean)) return;
+
+    if (mergedMap.has(clean)) {
+      const existing = mergedMap.get(clean)!;
+      mergedMap.set(clean, {
+        ...existing,
+        ...cloudEmp,
+        // Preserve local signature or photo if cloud doesn't have it
+        tandaTanganUrl: existing.tandaTanganUrl || cloudEmp.tandaTanganUrl,
+        fotoProfil: existing.fotoProfil || cloudEmp.fotoProfil,
+      });
+    } else {
+      mergedMap.set(clean, cloudEmp);
+    }
+  });
+
+  // Ensure default officer Riki Subagja is present
+  const rikiClean = cleanNipDigits(DEFAULT_USER_PROFILE.nip);
+  if (!mergedMap.has(rikiClean)) {
+    mergedMap.set(rikiClean, DEFAULT_USER_PROFILE);
+  }
+
+  const result = Array.from(mergedMap.values());
+  saveNipDirectory(result);
+  return result;
+}
+
 export function findProfileByNip(nipInput: string): UserProfile | null {
   const cleanInput = cleanNipDigits(nipInput);
   if (!cleanInput) return null;
@@ -463,6 +537,11 @@ export function saveProfileToNipDirectory(profile: UserProfile): void {
   }
 
   saveNipDirectory(updated);
+
+  // Sync to Cloud Firestore so colleagues and new devices get this employee immediately!
+  syncEmployeeToCloud(profile).catch((err) => {
+    console.warn('Sync employee to cloud warning:', err);
+  });
 }
 
 export function deleteProfileFromNipDirectory(nipInput: string): UserProfile[] {
@@ -473,6 +552,12 @@ export function deleteProfileFromNipDirectory(nipInput: string): UserProfile[] {
   // Don't delete Riki Subagja as he is default personnel
   const updated = directory.filter((item) => cleanNipDigits(item.nip) !== cleanInput || cleanInput === cleanNipDigits(DEFAULT_USER_PROFILE.nip));
   saveNipDirectory(updated);
+
+  // Delete from Cloud Firestore
+  deleteEmployeeFromCloud(cleanInput).catch((err) => {
+    console.warn('Delete employee from cloud warning:', err);
+  });
+
   return updated;
 }
 

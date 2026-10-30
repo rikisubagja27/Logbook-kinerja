@@ -18,7 +18,26 @@
         "tandaTanganUrl": { "type": "string" },
         "updatedAt": { "type": "string" }
       },
-      "required": ["nama", "nip", "email"]
+      "required": ["nama", "nip"]
+    },
+    "Employee": {
+      "title": "Employee",
+      "description": "Registered employee roster document in the shared KPS 1 Manoko directory",
+      "type": "object",
+      "properties": {
+        "nama": { "type": "string" },
+        "nip": { "type": "string" },
+        "jabatan": { "type": "string" },
+        "statusKepegawaian": { "type": "string" },
+        "unitKerja": { "type": "string" },
+        "instansiInduk": { "type": "string" },
+        "kementerian": { "type": "string" },
+        "tempatPenetapan": { "type": "string" },
+        "email": { "type": "string" },
+        "fotoProfil": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["nama", "nip"]
     },
     "LogbookEntry": {
       "title": "LogbookEntry",
@@ -46,6 +65,10 @@
     }
   },
   "firestore": {
+    "/employees/{employeeId}": {
+      "schema": "Employee",
+      "description": "Shared directory of registered employees and NIPs in KPS PVT 1 Manoko"
+    },
     "/users/{userId}/profile/main": {
       "schema": "UserProfile",
       "description": "Profile document of the authenticated user"

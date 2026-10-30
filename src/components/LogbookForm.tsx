@@ -281,7 +281,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     if (!file) return;
     try {
       setIsProcessingSurat(true);
-      const result = await resizeImageFile(file, 1200, 0.85);
+      const result = await resizeImageFile(file, 900, 0.75);
       const meta = `Ukuran: ${formatBytes(result.originalSize)} ➔ ${formatBytes(result.newSize)} (${result.width}×${result.height}px)`;
       setSuratSakit(result.dataUrl);
       setSuratSakitMeta(meta);
@@ -307,7 +307,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     else setIsProcessingSesudah(true);
 
     try {
-      const result = await resizeImageFile(file, 1080, 0.8);
+      const result = await resizeImageFile(file, 800, 0.7);
       const metaInfo = `Ukuran: ${formatBytes(result.originalSize)} ➔ ${formatBytes(result.newSize)} (${result.width}×${result.height}px)`;
 
       if (type === 'sebelum') {

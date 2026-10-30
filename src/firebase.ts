@@ -168,3 +168,93 @@ export async function fetchCloudEntries(userId: string): Promise<LogbookEntry[]>
     return [];
   }
 }
+
+// Check redirect login result for mobile / standalone PWA browsers
+export async function handleGoogleRedirectResult(): Promise<FirebaseUser | null> {
+  try {
+    const result = await getRedirectResult(auth);
+    if (result && result.user) {
+      return result.user;
+    }
+  } catch (err) {
+    console.warn('Redirect auth check warning:', err);
+  }
+  return null;
+}
+
+// ==========================================
+// Shared Employee / NIP Directory Cloud Sync
+// Ensures registered colleagues are preserved across all devices & shared links
+// ==========================================
+
+export async function syncEmployeeToCloud(employee: UserProfile): Promise<void> {
+  const cleanNip = employee.nip ? employee.nip.replace(/\D/g, '') : '';
+  if (!cleanNip) return;
+
+  try {
+    const empRef = doc(db, 'employees', cleanNip);
+    await setDoc(empRef, {
+      nama: employee.nama,
+      nip: cleanNip,
+      jabatan: employee.jabatan || 'Operator Layanan Operasional',
+      statusKepegawaian: employee.statusKepegawaian || 'PPPK Paruh Waktu',
+      unitKerja: employee.unitKerja || 'Kebun Pemeriksaan Substantif PVT I Manoko',
+      instansiInduk: employee.instansiInduk || 'Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian',
+      kementerian: employee.kementerian || 'Kementerian Pertanian',
+      tempatPenetapan: employee.tempatPenetapan || 'Bandung Barat',
+      email: employee.email || '',
+      fotoProfil: employee.fotoProfil || '',
+      updatedAt: new Date().toISOString(),
+    }, { merge: true });
+  } catch (err) {
+    console.error('Error syncing employee to cloud:', err);
+  }
+}
+
+export async function deleteEmployeeFromCloud(nip: string): Promise<void> {
+  const cleanNip = nip ? nip.replace(/\D/g, '') : '';
+  if (!cleanNip) return;
+
+  try {
+    const empRef = doc(db, 'employees', cleanNip);
+    await deleteDoc(empRef);
+  } catch (err) {
+    console.error('Error deleting employee from cloud:', err);
+  }
+}
+
+export async function fetchCloudEmployees(): Promise<UserProfile[]> {
+  try {
+    const colRef = collection(db, 'employees');
+    const snapshot = await getDocs(colRef);
+    const list: UserProfile[] = [];
+    snapshot.forEach((docSnap) => {
+      list.push(docSnap.data() as UserProfile);
+    });
+    return list;
+  } catch (err) {
+    console.warn('Error fetching cloud employees:', err);
+    return [];
+  }
+}
+
+export function subscribeToCloudEmployees(onUpdate: (employees: UserProfile[]) => void): () => void {
+  try {
+    const colRef = collection(db, 'employees');
+    return onSnapshot(colRef, (snapshot) => {
+      const list: UserProfile[] = [];
+      snapshot.forEach((docSnap) => {
+        list.push(docSnap.data() as UserProfile);
+      });
+      if (list.length > 0) {
+        onUpdate(list);
+      }
+    }, (error) => {
+      console.warn('Employees snapshot warning:', error);
+    });
+  } catch (err) {
+    console.warn('Error subscribing to employees:', err);
+    return () => {};
+  }
+}
+

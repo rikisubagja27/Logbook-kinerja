@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { UserProfile } from '../types/logbook';
 import { 
   findProfileByNip, 
@@ -9,8 +9,10 @@ import {
   loadEpersonalAutoOpen, 
   saveEpersonalAutoOpen, 
   getEpersonalUrlWithNip, 
-  DEFAULT_USER_PROFILE 
+  DEFAULT_USER_PROFILE,
+  mergeCloudNipDirectory
 } from '../utils/storage';
+import { subscribeToCloudEmployees } from '../firebase';
 import { 
   Building2, 
   KeyRound, 
@@ -45,6 +47,18 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
   const [officerDirectory, setOfficerDirectory] = useState<UserProfile[]>(() => loadNipDirectory());
   const [nipSuccessInfo, setNipSuccessInfo] = useState<string | null>(null);
   const [nipErrorInfo, setNipErrorInfo] = useState<string | null>(null);
+  const [justRegisteredOfficer, setJustRegisteredOfficer] = useState<UserProfile | null>(null);
+
+  // Subscribe to shared employee roster from Cloud Firestore
+  useEffect(() => {
+    const unsub = subscribeToCloudEmployees((cloudList) => {
+      if (cloudList && cloudList.length > 0) {
+        const merged = mergeCloudNipDirectory(cloudList);
+        setOfficerDirectory(merged);
+      }
+    });
+    return () => unsub();
+  }, []);
 
   // E-Personal Settings
   const [autoOpenEpersonal, setAutoOpenEpersonal] = useState<boolean>(() => loadEpersonalAutoOpen());
@@ -171,10 +185,9 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
       setTimeout(() => setCopiedNipStatus(null), 4000);
     } catch {}
 
-    if (autoOpenEpersonal) {
-      const targetUrl = getEpersonalUrlWithNip(newProfile.nip);
-      window.open(targetUrl, '_blank', 'noopener,noreferrer');
-    }
+    // Do NOT automatically redirect or open e-personal when registering new employee
+    // Save the data to local and cloud storage, and only open if user explicitly clicks the action button
+    setJustRegisteredOfficer(newProfile);
 
     setIsRegisterModalOpen(false);
     setNewEmpError(null);
@@ -448,6 +461,50 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
             <span>+ Daftarkan Karyawan Baru</span>
           </button>
         </div>
+
+        {/* Dedicated banner when employee was just registered: shows saved confirmation without auto-redirecting */}
+        {justRegisteredOfficer && (
+          <div className="bg-gradient-to-r from-emerald-950 via-stone-900 to-emerald-950 border-2 border-emerald-400 p-4 sm:p-5 rounded-2xl shadow-xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 animate-fade-in text-white">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/25 border border-emerald-400/50 flex items-center justify-center shrink-0 text-emerald-300">
+                <CheckCircle2 className="w-6 h-6" />
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-bold text-white flex items-center gap-2">
+                  <span>Data Karyawan Berhasil Disimpan!</span>
+                  <span className="text-[10px] bg-emerald-500/30 text-emerald-300 px-2 py-0.5 rounded-full font-mono">
+                    Tersimpan di Cloud
+                  </span>
+                </p>
+                <p className="text-xs text-stone-200">
+                  <strong>{justRegisteredOfficer.nama}</strong> · NIP: <span className="font-mono text-emerald-300 font-bold">{justRegisteredOfficer.nip}</span> telah tersimpan di direktori bersama.
+                </p>
+                <p className="text-[11px] text-stone-400">
+                  Data NIP otomatis disalin. Ketuk tombol di samping jika Anda ingin membuka portal E-Personal Kementan.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 self-end sm:self-center shrink-0">
+              <button
+                type="button"
+                onClick={() => handleOpenEpersonal(justRegisteredOfficer.nip, justRegisteredOfficer.nama)}
+                className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-all shadow-md cursor-pointer border border-emerald-400/40 active:scale-95"
+              >
+                <ExternalLink className="w-4 h-4 text-amber-300" />
+                <span>Buka E-Personal (Salin NIP) ↗</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setJustRegisteredOfficer(null)}
+                className="p-2 text-stone-400 hover:text-white rounded-lg hover:bg-stone-800 transition cursor-pointer"
+                title="Tutup konfirmasi"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+        )}
 
         <p className="text-xs text-stone-300">
           Klik pada salah satu kartu karyawan untuk langsung masuk sebagai pengguna tersebut, atau klik tombol <strong>`↗`</strong> untuk langsung membuka E-Personal dengan NIP tersebut.

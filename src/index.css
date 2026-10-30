@@ -265,3 +265,13 @@ html {
   min-height: 297mm;
   box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.3), 0 4px 12px -2px rgba(0, 0, 0, 0.2);
 }
+
+/* Prevent mobile devices (iOS Safari & Android) from zooming in when focusing form inputs */
+@media screen and (max-width: 768px) {
+  input:not(.report-page input),
+  select:not(.report-page select),
+  textarea:not(.report-page textarea) {
+    font-size: 16px !important;
+  }
+}
+
