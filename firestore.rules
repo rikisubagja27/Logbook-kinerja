@@ -21,7 +21,7 @@ service cloud.firestore {
     match /employees/{employeeId} {
       allow read: if true;
       allow create, update: if request.resource.data.nama is string && request.resource.data.nip is string;
-      allow delete: if isSignedIn();
+      allow delete: if true;
     }
 
     // User data scoped strictly to the authenticated user's UID

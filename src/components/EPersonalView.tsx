@@ -13,7 +13,12 @@ import {
   mergeCloudNipDirectory,
   initRosterFromIDB
 } from '../utils/storage';
-import { subscribeToCloudEmployees, fetchCloudEmployees } from '../firebase';
+import { 
+  subscribeToCloudEmployees, 
+  fetchCloudEmployees, 
+  syncAllEmployeesToCloud,
+  loginWithGoogle 
+} from '../firebase';
 import { 
   Building2, 
   KeyRound, 
@@ -31,7 +36,8 @@ import {
   BadgeCheck,
   Check,
   ArrowRight,
-  RefreshCw
+  RefreshCw,
+  LogIn
 } from 'lucide-react';
 
 interface EPersonalViewProps {
@@ -52,6 +58,7 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
   const [justRegisteredOfficer, setJustRegisteredOfficer] = useState<UserProfile | null>(null);
 
   const [isRefreshingRoster, setIsRefreshingRoster] = useState(false);
+  const [isSavingNewEmp, setIsSavingNewEmp] = useState(false);
 
   // Load from IndexedDB and subscribe to shared employee roster & cross-window updates
   useEffect(() => {
@@ -59,6 +66,8 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
     initRosterFromIDB().then((idbList) => {
       if (idbList && idbList.length > 0) {
         setOfficerDirectory(idbList);
+        // Push any local officers to Cloud Firestore so new devices/PWA can read them
+        syncAllEmployeesToCloud(idbList).catch(() => {});
       }
     });
 
@@ -95,10 +104,12 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
   const handleRefreshRoster = async () => {
     setIsRefreshingRoster(true);
     try {
-      // 1. Load from IndexedDB first
+      // 1. Load from IndexedDB and localStorage first
       const idbList = await initRosterFromIDB();
       if (idbList.length > 0) {
         setOfficerDirectory(idbList);
+        // Push all local officers to Cloud Firestore (guarantees offline/Safari registrations reach cloud!)
+        await syncAllEmployeesToCloud(idbList);
       }
 
       // 2. Fetch fresh list from Cloud Firestore
@@ -106,7 +117,7 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
       if (cloudList && cloudList.length > 0) {
         const merged = mergeCloudNipDirectory(cloudList);
         setOfficerDirectory(merged);
-        displayToast(`Direktori NIP disinkronkan (${merged.length} karyawan terdaftar)!`);
+        displayToast(`Direktori NIP disinkronkan (${merged.length} karyawan terdaftar di Cloud & Lokal)!`);
       } else {
         displayToast(`Direktori NIP dimuat ulang (${idbList.length} karyawan terdaftar).`);
       }
@@ -201,7 +212,7 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
     }
   };
 
-  const handleRegisterNewEmployee = (e: React.FormEvent) => {
+  const handleRegisterNewEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newEmpFormData.nama?.trim()) {
       setNewEmpError('Silakan masukkan nama lengkap pegawai.');
@@ -229,42 +240,52 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
       tandaTanganUrl: undefined,
     };
 
-    saveProfileToNipDirectory(newProfile);
-    const updatedRoster = loadNipDirectory();
-    setOfficerDirectory(updatedRoster);
-
-    // Automatically load newly registered employee into active session
-    onSelectProfile(newProfile);
-
-    // Auto-copy NIP
-    try {
-      navigator.clipboard.writeText(newProfile.nip);
-      setCopiedNipStatus(newProfile.nip);
-      setTimeout(() => setCopiedNipStatus(null), 4000);
-    } catch {}
-
-    // Do NOT automatically redirect or open e-personal when registering new employee
-    // Save the data to local and cloud storage, and only open if user explicitly clicks the action button
-    setJustRegisteredOfficer(newProfile);
-
-    setIsRegisterModalOpen(false);
+    setIsSavingNewEmp(true);
     setNewEmpError(null);
-    setNewEmpFormData({
-      nama: '',
-      nip: '',
-      jabatan: 'Operator Layanan Operasional',
-      statusKepegawaian: 'PPPK Paruh Waktu',
-      unitKerja: 'Kebun Pemeriksaan Substantif PVT I Manoko',
-      instansiInduk: 'Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian',
-      kementerian: 'Kementerian Pertanian',
-      tempatPenetapan: 'Bandung Barat',
-      email: '',
-    });
 
-    displayToast(`Karyawan "${newProfile.nama}" berhasil didaftarkan & NIP otomatis aktif!`);
+    try {
+      // Await saving to LocalStorage, IndexedDB, and Cloud Firestore!
+      await saveProfileToNipDirectory(newProfile);
+
+      const updatedRoster = loadNipDirectory();
+      setOfficerDirectory(updatedRoster);
+
+      // Automatically load newly registered employee into active session
+      onSelectProfile(newProfile);
+
+      // Auto-copy NIP
+      try {
+        navigator.clipboard.writeText(newProfile.nip);
+        setCopiedNipStatus(newProfile.nip);
+        setTimeout(() => setCopiedNipStatus(null), 4000);
+      } catch {}
+
+      // Save the data to local and cloud storage, and only open if user explicitly clicks the action button
+      setJustRegisteredOfficer(newProfile);
+
+      setIsRegisterModalOpen(false);
+      setNewEmpFormData({
+        nama: '',
+        nip: '',
+        jabatan: 'Operator Layanan Operasional',
+        statusKepegawaian: 'PPPK Paruh Waktu',
+        unitKerja: 'Kebun Pemeriksaan Substantif PVT I Manoko',
+        instansiInduk: 'Pusat Pelindungan Varietas Tanaman dan Perizinan Pertanian',
+        kementerian: 'Kementerian Pertanian',
+        tempatPenetapan: 'Bandung Barat',
+        email: '',
+      });
+
+      displayToast(`Karyawan "${newProfile.nama}" berhasil didaftarkan & tersimpan di Cloud! Rekan kerja di perangkat lain langsung dapat melihatnya.`);
+    } catch (err: any) {
+      console.error('Registration save error:', err);
+      setNewEmpError('Terjadi kendala saat menyimpan data: ' + (err.message || 'Coba periksa koneksi internet.'));
+    } finally {
+      setIsSavingNewEmp(false);
+    }
   };
 
-  const handleDeleteOfficer = (e: React.MouseEvent, officerNip: string, officerName: string) => {
+  const handleDeleteOfficer = async (e: React.MouseEvent, officerNip: string, officerName: string) => {
     e.stopPropagation();
     const cleanCurrent = cleanNipDigits(DEFAULT_USER_PROFILE.nip);
     const cleanTarget = cleanNipDigits(officerNip);
@@ -274,9 +295,9 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
     }
 
     if (window.confirm(`Hapus pegawai "${officerName}" dari direktori NIP KPS 1 Manoko?`)) {
-      const updated = deleteProfileFromNipDirectory(officerNip);
+      const updated = await deleteProfileFromNipDirectory(officerNip);
       setOfficerDirectory(updated);
-      displayToast(`Pegawai "${officerName}" dihapus dari direktori.`);
+      displayToast(`Pegawai "${officerName}" dihapus dari direktori lokal & Cloud.`);
     }
   };
 
@@ -815,9 +836,17 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-600 rounded-lg shadow-md transition-all border border-emerald-600"
+                  disabled={isSavingNewEmp}
+                  className="px-5 py-2 text-xs font-bold text-white bg-emerald-700 hover:bg-emerald-600 rounded-lg shadow-md transition-all border border-emerald-600 cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
                 >
-                  Simpan &amp; Daftarkan Karyawan
+                  {isSavingNewEmp ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>Menyimpan ke Cloud...</span>
+                    </>
+                  ) : (
+                    <span>Simpan &amp; Daftarkan Karyawan</span>
+                  )}
                 </button>
               </div>
             </form>

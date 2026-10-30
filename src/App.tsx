@@ -12,7 +12,8 @@ import {
   saveGoogleAccount,
   clearGoogleAccount,
   mergeCloudNipDirectory,
-  initRosterFromIDB
+  initRosterFromIDB,
+  loadNipDirectory
 } from './utils/storage';
 import { 
   auth, 
@@ -23,6 +24,7 @@ import {
   batchSyncEntriesToCloud,
   subscribeToCloudEmployees,
   fetchCloudEmployees,
+  syncAllEmployeesToCloud,
   handleGoogleRedirectResult
 } from './firebase';
 import { 
@@ -47,12 +49,34 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'form' | 'list' | 'report' | 'cloudsync' | 'profile' | 'epersonal'>('form');
   const [entries, setEntries] = useState<LogbookEntry[]>(() => loadLogbookEntries());
   const [profile, setProfile] = useState<UserProfile>(() => loadUserProfile());
+  const [officerDirectory, setOfficerDirectory] = useState<UserProfile[]>(() => loadNipDirectory());
+  const [isRefreshingOfficers, setIsRefreshingOfficers] = useState(false);
   const [editingEntry, setEditingEntry] = useState<LogbookEntry | null>(null);
 
   // Firebase Real-time Cloud Synchronization State
   const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialSyncRef = useRef(false);
+
+  const handleRefreshOfficers = useCallback(async () => {
+    setIsRefreshingOfficers(true);
+    try {
+      const idbList = await initRosterFromIDB();
+      if (idbList.length > 0) {
+        setOfficerDirectory(idbList);
+        await syncAllEmployeesToCloud(idbList);
+      }
+      const cloudList = await fetchCloudEmployees();
+      if (cloudList && cloudList.length > 0) {
+        const merged = mergeCloudNipDirectory(cloudList);
+        setOfficerDirectory(merged);
+      }
+    } catch (err) {
+      console.warn('Roster refresh warning:', err);
+    } finally {
+      setIsRefreshingOfficers(false);
+    }
+  }, []);
 
   // Monitor Authentication State & Check Redirect Result
   useEffect(() => {
@@ -78,22 +102,40 @@ export default function App() {
       }
     });
 
-    // 1. Initial async load from IndexedDB and Cloud Firestore for shared employee roster
-    initRosterFromIDB().catch(() => {});
-    fetchCloudEmployees().then((cloudEmps) => {
-      if (cloudEmps && cloudEmps.length > 0) {
-        mergeCloudNipDirectory(cloudEmps);
+    // 1. Initial async load from IndexedDB and auto-heal/push local roster to Cloud Firestore
+    initRosterFromIDB().then((idbOfficers) => {
+      if (idbOfficers && idbOfficers.length > 0) {
+        setOfficerDirectory(idbOfficers);
+        // Push local officers to cloud so colleagues on shared devices immediately get them!
+        syncAllEmployeesToCloud(idbOfficers).catch(() => {});
       }
     }).catch(() => {});
 
-    // 2. Realtime subscribe to shared employee roster so registered colleagues appear on all devices
+    // 2. Fetch fresh employees directly from Cloud Firestore
+    fetchCloudEmployees().then((cloudEmps) => {
+      if (cloudEmps && cloudEmps.length > 0) {
+        const merged = mergeCloudNipDirectory(cloudEmps);
+        setOfficerDirectory(merged);
+      }
+    }).catch(() => {});
+
+    // 3. Realtime subscribe to shared employee roster so registered colleagues appear on all devices
     const unsubscribeEmployees = subscribeToCloudEmployees((cloudEmps) => {
       if (cloudEmps && cloudEmps.length > 0) {
-        mergeCloudNipDirectory(cloudEmps);
+        const merged = mergeCloudNipDirectory(cloudEmps);
+        setOfficerDirectory(merged);
       }
     });
 
-    // 3. Load all entries from high-capacity IndexedDB to ensure daily entries are never lost
+    // 4. Listen to local custom event triggered by IndexedDB or other tabs
+    const handleDirectoryUpdated = (e: any) => {
+      if (Array.isArray(e.detail) && e.detail.length > 0) {
+        setOfficerDirectory(e.detail);
+      }
+    };
+    window.addEventListener('kps-nip-directory-updated', handleDirectoryUpdated);
+
+    // 5. Load all entries from high-capacity IndexedDB to ensure daily entries are never lost
     getAllEntriesFromIDB().then((idbEntries) => {
       if (idbEntries && idbEntries.length > 0) {
         setEntries((prev) => {
@@ -108,6 +150,7 @@ export default function App() {
     return () => {
       unsubscribeAuth();
       unsubscribeEmployees();
+      window.removeEventListener('kps-nip-directory-updated', handleDirectoryUpdated);
     };
   }, []);
 
@@ -270,6 +313,10 @@ export default function App() {
           setActiveTab(tab);
         }}
         profile={profile}
+        officers={officerDirectory}
+        onSelectProfile={handleSaveProfile}
+        onRefreshOfficers={handleRefreshOfficers}
+        isRefreshingOfficers={isRefreshingOfficers}
       />
 
       {/* Offline Status Alert */}

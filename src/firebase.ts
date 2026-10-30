@@ -6,6 +6,7 @@ import {
   getFirestore, 
   doc, 
   getDocFromServer, 
+  getDocsFromServer,
   collection, 
   onSnapshot, 
   setDoc, 
@@ -205,14 +206,14 @@ export async function handleGoogleRedirectResult(): Promise<FirebaseUser | null>
 // Ensures registered colleagues are preserved across all devices & shared links
 // ==========================================
 
-export async function syncEmployeeToCloud(employee: UserProfile): Promise<void> {
+export async function syncEmployeeToCloud(employee: UserProfile): Promise<boolean> {
   const cleanNip = employee.nip ? employee.nip.replace(/\D/g, '') : '';
-  if (!cleanNip) return;
+  if (!cleanNip || !employee.nama) return false;
 
   try {
     const empRef = doc(db, 'employees', cleanNip);
     await setDoc(empRef, {
-      nama: employee.nama,
+      nama: employee.nama.trim().toUpperCase(),
       nip: cleanNip,
       jabatan: employee.jabatan || 'Operator Layanan Operasional',
       statusKepegawaian: employee.statusKepegawaian || 'PPPK Paruh Waktu',
@@ -224,9 +225,28 @@ export async function syncEmployeeToCloud(employee: UserProfile): Promise<void> 
       fotoProfil: employee.fotoProfil || '',
       updatedAt: new Date().toISOString(),
     }, { merge: true });
+    return true;
   } catch (err) {
     console.error('Error syncing employee to cloud:', err);
+    throw err;
   }
+}
+
+export async function syncAllEmployeesToCloud(employees: UserProfile[]): Promise<number> {
+  if (!employees || employees.length === 0) return 0;
+  let successCount = 0;
+  for (const emp of employees) {
+    try {
+      const clean = emp.nip ? emp.nip.replace(/\D/g, '') : '';
+      if (clean && emp.nama) {
+        await syncEmployeeToCloud(emp);
+        successCount++;
+      }
+    } catch (e) {
+      console.warn(`Failed to sync employee ${emp.nama} (${emp.nip}) to cloud:`, e);
+    }
+  }
+  return successCount;
 }
 
 export async function deleteEmployeeFromCloud(nip: string): Promise<void> {
@@ -238,16 +258,39 @@ export async function deleteEmployeeFromCloud(nip: string): Promise<void> {
     await deleteDoc(empRef);
   } catch (err) {
     console.error('Error deleting employee from cloud:', err);
+    throw err;
   }
 }
 
 export async function fetchCloudEmployees(): Promise<UserProfile[]> {
   try {
     const colRef = collection(db, 'employees');
+
+    // 1. Try fetching directly from Firestore backend server to ensure fresh multi-device sync
+    try {
+      const serverSnap = await getDocsFromServer(colRef);
+      const list: UserProfile[] = [];
+      serverSnap.forEach((docSnap) => {
+        const data = docSnap.data();
+        if (data && data.nip && data.nama) {
+          list.push(data as UserProfile);
+        }
+      });
+      if (list.length > 0) {
+        return list;
+      }
+    } catch (serverErr) {
+      console.warn('getDocsFromServer notice (falling back to cache):', serverErr);
+    }
+
+    // 2. Fallback to standard getDocs (reads cache or server)
     const snapshot = await getDocs(colRef);
     const list: UserProfile[] = [];
     snapshot.forEach((docSnap) => {
-      list.push(docSnap.data() as UserProfile);
+      const data = docSnap.data();
+      if (data && data.nip && data.nama) {
+        list.push(data as UserProfile);
+      }
     });
     return list;
   } catch (err) {
@@ -262,7 +305,10 @@ export function subscribeToCloudEmployees(onUpdate: (employees: UserProfile[]) =
     return onSnapshot(colRef, (snapshot) => {
       const list: UserProfile[] = [];
       snapshot.forEach((docSnap) => {
-        list.push(docSnap.data() as UserProfile);
+        const data = docSnap.data();
+        if (data && data.nip && data.nama) {
+          list.push(data as UserProfile);
+        }
       });
       if (list.length > 0) {
         onUpdate(list);

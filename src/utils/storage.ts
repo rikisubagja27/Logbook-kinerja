@@ -523,38 +523,50 @@ export async function initRosterFromIDB(): Promise<UserProfile[]> {
  * Merges employees retrieved from Cloud Firestore into the local directory.
  * Ensures any registered employee is visible on all devices and shared app links!
  */
+/**
+ * Merges employees retrieved from Cloud Firestore into the local directory.
+ * Ensures any registered employee is visible on all devices and shared app links!
+ * Also automatically uploads any local employee not yet in Cloud so no data is ever lost.
+ */
 export function mergeCloudNipDirectory(cloudOfficers: UserProfile[]): UserProfile[] {
-  if (!cloudOfficers || cloudOfficers.length === 0) return loadNipDirectory();
-
   const currentLocal = loadNipDirectory();
   const mergedMap = new Map<string, UserProfile>();
 
-  // Put local first
+  // 1. Put local officers into map first
   currentLocal.forEach((officer) => {
     const clean = cleanNipDigits(officer.nip);
-    if (clean) mergedMap.set(clean, officer);
-  });
-
-  // Merge cloud officers
-  cloudOfficers.forEach((cloudEmp) => {
-    const clean = cleanNipDigits(cloudEmp.nip);
-    if (!clean || LEGACY_MOCK_NIPS.has(clean)) return;
-
-    if (mergedMap.has(clean)) {
-      const existing = mergedMap.get(clean)!;
-      mergedMap.set(clean, {
-        ...existing,
-        ...cloudEmp,
-        // Preserve local signature or photo if cloud doesn't have it
-        tandaTanganUrl: existing.tandaTanganUrl || cloudEmp.tandaTanganUrl,
-        fotoProfil: existing.fotoProfil || cloudEmp.fotoProfil,
-      });
-    } else {
-      mergedMap.set(clean, cloudEmp);
+    if (clean && !LEGACY_MOCK_NIPS.has(clean)) {
+      mergedMap.set(clean, officer);
     }
   });
 
-  // Ensure default officer Riki Subagja is present
+  // 2. Set of cloud NIPs to detect newly arrived vs local-only
+  const cloudNips = new Set<string>();
+
+  // 3. Merge cloud officers
+  if (Array.isArray(cloudOfficers)) {
+    cloudOfficers.forEach((cloudEmp) => {
+      const clean = cleanNipDigits(cloudEmp.nip);
+      if (!clean || LEGACY_MOCK_NIPS.has(clean)) return;
+
+      cloudNips.add(clean);
+
+      if (mergedMap.has(clean)) {
+        const existing = mergedMap.get(clean)!;
+        mergedMap.set(clean, {
+          ...existing,
+          ...cloudEmp,
+          // Preserve local signature or photo if cloud doesn't have it
+          tandaTanganUrl: existing.tandaTanganUrl || cloudEmp.tandaTanganUrl,
+          fotoProfil: existing.fotoProfil || cloudEmp.fotoProfil,
+        });
+      } else {
+        mergedMap.set(clean, cloudEmp);
+      }
+    });
+  }
+
+  // 4. Ensure default officer Riki Subagja is always present
   const rikiClean = cleanNipDigits(DEFAULT_USER_PROFILE.nip);
   if (!mergedMap.has(rikiClean)) {
     mergedMap.set(rikiClean, DEFAULT_USER_PROFILE);
@@ -562,6 +574,18 @@ export function mergeCloudNipDirectory(cloudOfficers: UserProfile[]): UserProfil
 
   const result = Array.from(mergedMap.values());
   saveNipDirectory(result);
+
+  // 5. AUTO-HEALING: If local has any registered employees that Cloud didn't have yet
+  // (e.g. registered in Safari before rules or offline), automatically push them to Cloud!
+  result.forEach((emp) => {
+    const clean = cleanNipDigits(emp.nip);
+    if (clean && !cloudNips.has(clean) && emp.nama) {
+      syncEmployeeToCloud(emp).catch((err) => {
+        console.warn('Auto-healing push employee to cloud notice:', err);
+      });
+    }
+  });
+
   return result;
 }
 
@@ -574,9 +598,9 @@ export function findProfileByNip(nipInput: string): UserProfile | null {
   return match || null;
 }
 
-export function saveProfileToNipDirectory(profile: UserProfile): void {
+export async function saveProfileToNipDirectory(profile: UserProfile): Promise<boolean> {
   const cleanInput = cleanNipDigits(profile.nip);
-  if (!cleanInput) return;
+  if (!cleanInput) return false;
 
   const directory = loadNipDirectory();
   const index = directory.findIndex((item) => cleanNipDigits(item.nip) === cleanInput);
@@ -589,19 +613,23 @@ export function saveProfileToNipDirectory(profile: UserProfile): void {
     updated = [profile, ...directory];
   }
 
-  // Save to both LocalStorage, IndexedDB, and notify all windows
+  // 1. Save to LocalStorage, IndexedDB, and notify all windows
   saveNipDirectory(updated);
   saveSingleOfficerToIDB(profile).catch((err) => {
     console.warn('IDB saveSingleOfficer warning:', err);
   });
 
-  // Sync to Cloud Firestore so colleagues and new devices get this employee immediately!
-  syncEmployeeToCloud(profile).catch((err) => {
+  // 2. Sync to Cloud Firestore so colleagues and new devices get this employee immediately!
+  try {
+    await syncEmployeeToCloud(profile);
+    return true;
+  } catch (err) {
     console.warn('Sync employee to cloud warning:', err);
-  });
+    return false;
+  }
 }
 
-export function deleteProfileFromNipDirectory(nipInput: string): UserProfile[] {
+export async function deleteProfileFromNipDirectory(nipInput: string): Promise<UserProfile[]> {
   const cleanInput = cleanNipDigits(nipInput);
   if (!cleanInput) return loadNipDirectory();
 
@@ -615,9 +643,11 @@ export function deleteProfileFromNipDirectory(nipInput: string): UserProfile[] {
   });
 
   // Delete from Cloud Firestore
-  deleteEmployeeFromCloud(cleanInput).catch((err) => {
+  try {
+    await deleteEmployeeFromCloud(cleanInput);
+  } catch (err) {
     console.warn('Delete employee from cloud warning:', err);
-  });
+  }
 
   return updated;
 }
