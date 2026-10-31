@@ -42,55 +42,65 @@ import {
 
 interface EPersonalViewProps {
   currentProfile: UserProfile;
+  officers?: UserProfile[];
   onSelectProfile: (profile: UserProfile) => void;
   onNavigateToProfile?: () => void;
+  onRefreshOfficers?: () => Promise<void>;
+  isRefreshingOfficers?: boolean;
 }
 
 export const EPersonalView: React.FC<EPersonalViewProps> = ({
   currentProfile,
+  officers,
   onSelectProfile,
   onNavigateToProfile,
+  onRefreshOfficers,
+  isRefreshingOfficers = false,
 }) => {
   const [nipSearchInput, setNipSearchInput] = useState('');
-  const [officerDirectory, setOfficerDirectory] = useState<UserProfile[]>(() => loadNipDirectory());
+  const [internalDirectory, setInternalDirectory] = useState<UserProfile[]>(() => officers || loadNipDirectory());
+  const officerDirectory = officers && officers.length > 0 ? officers : internalDirectory;
+
   const [nipSuccessInfo, setNipSuccessInfo] = useState<string | null>(null);
   const [nipErrorInfo, setNipErrorInfo] = useState<string | null>(null);
   const [justRegisteredOfficer, setJustRegisteredOfficer] = useState<UserProfile | null>(null);
 
-  const [isRefreshingRoster, setIsRefreshingRoster] = useState(false);
+  const [isRefreshingLocalRoster, setIsRefreshingLocalRoster] = useState(false);
   const [isSavingNewEmp, setIsSavingNewEmp] = useState(false);
 
-  // Load from IndexedDB and subscribe to shared employee roster & cross-window updates
+  // Synchronize internalDirectory with props if props update
   useEffect(() => {
-    // 1. Initial async load from IndexedDB (preserves newly registered employees even in PWA standalone mode)
+    if (officers && officers.length > 0) {
+      setInternalDirectory(officers);
+    }
+  }, [officers]);
+
+  // Load from IndexedDB and listen to cross-window updates
+  useEffect(() => {
     initRosterFromIDB().then((idbList) => {
       if (idbList && idbList.length > 0) {
-        setOfficerDirectory(idbList);
-        // Push any local officers to Cloud Firestore so new devices/PWA can read them
+        setInternalDirectory(idbList);
         syncAllEmployeesToCloud(idbList).catch(() => {});
-      }
-    });
-
-    // 2. Fetch directly from Cloud Firestore once
-    fetchCloudEmployees().then((cloudList) => {
-      if (cloudList && cloudList.length > 0) {
-        const merged = mergeCloudNipDirectory(cloudList);
-        setOfficerDirectory(merged);
       }
     }).catch(() => {});
 
-    // 3. Realtime Firestore subscription
+    fetchCloudEmployees().then((cloudList) => {
+      if (cloudList && cloudList.length > 0) {
+        const merged = mergeCloudNipDirectory(cloudList);
+        setInternalDirectory(merged);
+      }
+    }).catch(() => {});
+
     const unsub = subscribeToCloudEmployees((cloudList) => {
       if (cloudList && cloudList.length > 0) {
         const merged = mergeCloudNipDirectory(cloudList);
-        setOfficerDirectory(merged);
+        setInternalDirectory(merged);
       }
     });
 
-    // 4. Listen to local custom event triggered by IndexedDB or other tabs
     const handleDirectoryUpdated = (e: any) => {
       if (Array.isArray(e.detail) && e.detail.length > 0) {
-        setOfficerDirectory(e.detail);
+        setInternalDirectory(e.detail);
       }
     };
     window.addEventListener('kps-nip-directory-updated', handleDirectoryUpdated);
@@ -102,21 +112,24 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
   }, []);
 
   const handleRefreshRoster = async () => {
-    setIsRefreshingRoster(true);
+    if (onRefreshOfficers) {
+      await onRefreshOfficers();
+      displayToast('Direktori NIP disinkronkan dari Cloud & Lokal.');
+      return;
+    }
+
+    setIsRefreshingLocalRoster(true);
     try {
-      // 1. Load from IndexedDB and localStorage first
       const idbList = await initRosterFromIDB();
       if (idbList.length > 0) {
-        setOfficerDirectory(idbList);
-        // Push all local officers to Cloud Firestore (guarantees offline/Safari registrations reach cloud!)
+        setInternalDirectory(idbList);
         await syncAllEmployeesToCloud(idbList);
       }
 
-      // 2. Fetch fresh list from Cloud Firestore
       const cloudList = await fetchCloudEmployees();
       if (cloudList && cloudList.length > 0) {
         const merged = mergeCloudNipDirectory(cloudList);
-        setOfficerDirectory(merged);
+        setInternalDirectory(merged);
         displayToast(`Direktori NIP disinkronkan (${merged.length} karyawan terdaftar di Cloud & Lokal)!`);
       } else {
         displayToast(`Direktori NIP dimuat ulang (${idbList.length} karyawan terdaftar).`);
@@ -125,7 +138,7 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
       console.warn('Refresh roster error:', err);
       displayToast('Gagal memuat dari Cloud, menggunakan data lokal.');
     } finally {
-      setIsRefreshingRoster(false);
+      setIsRefreshingLocalRoster(false);
     }
   };
 
@@ -248,7 +261,10 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
       await saveProfileToNipDirectory(newProfile);
 
       const updatedRoster = loadNipDirectory();
-      setOfficerDirectory(updatedRoster);
+      setInternalDirectory(updatedRoster);
+      if (onRefreshOfficers) {
+        onRefreshOfficers().catch(() => {});
+      }
 
       // Automatically load newly registered employee into active session
       onSelectProfile(newProfile);
@@ -296,7 +312,10 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
 
     if (window.confirm(`Hapus pegawai "${officerName}" dari direktori NIP KPS 1 Manoko?`)) {
       const updated = await deleteProfileFromNipDirectory(officerNip);
-      setOfficerDirectory(updated);
+      setInternalDirectory(updated);
+      if (onRefreshOfficers) {
+        onRefreshOfficers().catch(() => {});
+      }
       displayToast(`Pegawai "${officerName}" dihapus dari direktori lokal & Cloud.`);
     }
   };
@@ -530,12 +549,12 @@ export const EPersonalView: React.FC<EPersonalViewProps> = ({
             <button
               type="button"
               onClick={handleRefreshRoster}
-              disabled={isRefreshingRoster}
+              disabled={isRefreshingOfficers || isRefreshingLocalRoster}
               className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-stone-800/90 hover:bg-stone-700 text-stone-200 text-xs font-semibold transition-all border border-stone-700 shadow-sm cursor-pointer disabled:opacity-50"
               title="Perbarui daftar karyawan dari memori lokal dan Cloud"
             >
-              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshingRoster ? 'animate-spin' : ''}`} />
-              <span>{isRefreshingRoster ? 'Memperbarui...' : 'Sinkron NIP'}</span>
+              <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshingOfficers || isRefreshingLocalRoster ? 'animate-spin' : ''}`} />
+              <span>{isRefreshingOfficers || isRefreshingLocalRoster ? 'Memperbarui...' : 'Sinkron NIP'}</span>
             </button>
 
             {/* Register New Officer Button */}

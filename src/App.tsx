@@ -139,10 +139,12 @@ export default function App() {
     getAllEntriesFromIDB().then((idbEntries) => {
       if (idbEntries && idbEntries.length > 0) {
         setEntries((prev) => {
-          if (idbEntries.length >= prev.length) {
-            return sortLogbookEntriesByDateAscending(idbEntries);
-          }
-          return prev;
+          const map = new Map<string, LogbookEntry>();
+          prev.forEach((e) => map.set(e.id, e));
+          idbEntries.forEach((e) => map.set(e.id, e));
+          const merged = sortLogbookEntriesByDateAscending(Array.from(map.values()));
+          saveLogbookEntries(merged);
+          return merged;
         });
       }
     }).catch((err) => console.warn('IDB load warning:', err));
@@ -177,10 +179,21 @@ export default function App() {
           batchSyncEntriesToCloud(currentUser.uid, localList);
         }
       } else if (cloudEntries.length > 0) {
-        // Sort ascending by date
-        const sorted = sortLogbookEntriesByDateAscending(cloudEntries);
-        setEntries(sorted);
-        saveLogbookEntries(sorted);
+        // MERGE: Keep union of local and cloud entries so no entries are lost!
+        setEntries((prev) => {
+          const map = new Map<string, LogbookEntry>();
+          cloudEntries.forEach((e) => map.set(e.id, e));
+          // Preserve any local entries that aren't yet in cloud, and upload them
+          prev.forEach((e) => {
+            if (!map.has(e.id)) {
+              map.set(e.id, e);
+              syncEntryToCloud(currentUser.uid, e);
+            }
+          });
+          const merged = sortLogbookEntriesByDateAscending(Array.from(map.values()));
+          saveLogbookEntries(merged);
+          return merged;
+        });
       }
     }, (error) => {
       console.warn('Firestore entries snapshot warning:', error);
@@ -376,8 +389,11 @@ export default function App() {
         {activeTab === 'epersonal' && (
           <EPersonalView
             currentProfile={profile}
+            officers={officerDirectory}
             onSelectProfile={handleSaveProfile}
             onNavigateToProfile={() => setActiveTab('profile')}
+            onRefreshOfficers={handleRefreshOfficers}
+            isRefreshingOfficers={isRefreshingOfficers}
           />
         )}
 

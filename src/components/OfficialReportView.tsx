@@ -273,6 +273,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   const filteredEntries = useMemo(() => {
     return entries
       .filter((e) => {
+        if (reportConfig.tipe === 'semua') {
+          return true; // Show all logbook entries
+        }
+
         const d = new Date(e.tanggal);
         const entryYear = d.getFullYear();
         const entryMonth = d.getMonth() + 1;
@@ -331,7 +335,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   const defaultTable1Data = useMemo(() => {
     const groups: Table1RowItem[] = [];
 
-    if (reportConfig.tipe === 'bulanan') {
+    if (reportConfig.tipe === 'bulanan' || reportConfig.tipe === 'semua') {
       filteredEntries.forEach((e) => {
         const d = new Date(e.tanggal);
         const dateStr = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
@@ -583,14 +587,17 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     setHasCustomEdits(false);
   };
 
-  // Paginate Table 1 so each A4 sheet holds at most 10 rows, preventing table cut-offs & overflow
+  // Dynamic pagination for Table 1:
+  // Page 0 has BAB II heading, 2.1 description, and table description (max 7 rows)
+  // Subsequent continuation pages have only continuation table header (max 9 rows)
+  // Ensures that up to 16+ rows fit into exactly 2 A4 sheets with zero clipping or cut-offs
   const table1Pages = useMemo(() => {
     if (customTable1.length === 0) return [[]];
-    if (customTable1.length <= 10) return [customTable1];
+    if (customTable1.length <= 7) return [customTable1];
     const pages: Table1RowItem[][] = [];
-    const chunkSize = 10;
-    for (let i = 0; i < customTable1.length; i += chunkSize) {
-      pages.push(customTable1.slice(i, i + chunkSize));
+    pages.push(customTable1.slice(0, 7));
+    for (let i = 7; i < customTable1.length; i += 9) {
+      pages.push(customTable1.slice(i, i + 9));
     }
     return pages;
   }, [customTable1]);
@@ -654,9 +661,57 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       }
     });
 
+    // Enforce crisp 1px solid black borders for all tables and cells in clonedDoc
+    const clonedTables = clonedDoc.querySelectorAll<HTMLTableElement>('table');
+    clonedTables.forEach((t) => {
+      t.style.borderCollapse = 'collapse';
+      t.style.width = '100%';
+      t.style.tableLayout = 'fixed';
+      t.style.border = '1px solid #000000';
+    });
+
     const tableCells = clonedDoc.querySelectorAll<HTMLElement>('table td, table th');
     tableCells.forEach((c) => {
       c.style.fontSize = '11pt';
+      c.style.border = '1px solid #000000';
+      c.style.borderColor = '#000000';
+      c.style.boxSizing = 'border-box';
+    });
+
+    // Mathematically fit all documentation photos inside cell containers so they NEVER overflow or spill out
+    const docPhotoImgs = clonedDoc.querySelectorAll<HTMLImageElement>('table img');
+    docPhotoImgs.forEach((img) => {
+      const parentContainer = img.closest<HTMLElement>('div');
+      if (parentContainer) {
+        parentContainer.style.width = '260px';
+        parentContainer.style.maxWidth = '260px';
+        parentContainer.style.height = '165px';
+        parentContainer.style.maxHeight = '165px';
+        parentContainer.style.overflow = 'hidden';
+        parentContainer.style.display = 'flex';
+        parentContainer.style.alignItems = 'center';
+        parentContainer.style.justifyContent = 'center';
+        parentContainer.style.margin = '0 auto';
+        parentContainer.style.boxSizing = 'border-box';
+        parentContainer.style.border = '1px solid #555555';
+        parentContainer.style.backgroundColor = '#f8fafc';
+      }
+
+      const maxW = 250;
+      const maxH = 160;
+      if (img.naturalWidth && img.naturalHeight) {
+        const ratio = Math.min(maxW / img.naturalWidth, maxH / img.naturalHeight);
+        img.style.width = `${Math.round(img.naturalWidth * ratio)}px`;
+        img.style.height = `${Math.round(img.naturalHeight * ratio)}px`;
+      } else {
+        img.style.maxWidth = '250px';
+        img.style.maxHeight = '160px';
+        img.style.width = 'auto';
+        img.style.height = 'auto';
+      }
+      img.style.display = 'block';
+      img.style.margin = '0 auto';
+      img.style.boxSizing = 'border-box';
     });
 
     // Hide all interactive UI / controls in cloned document
@@ -1143,23 +1198,23 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         {!isPanelHidden ? (
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1 animate-fade-in">
             {/* Kategori Laporan (Diperbesar) */}
-            <div className="sm:col-span-1">
+            <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-stone-300 mb-1.5">
-                Kategori Laporan
+                Kategori Laporan (Pilih Periode / Semua)
               </label>
-              <div className="grid grid-cols-3 gap-1 bg-stone-900 p-1 rounded-xl border border-stone-700">
-                {(['bulanan', 'triwulan', 'tahunan'] as ReportType[]).map((tipe) => (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-stone-900 p-1 rounded-xl border border-stone-700">
+                {(['semua', 'bulanan', 'triwulan', 'tahunan'] as ReportType[]).map((tipe) => (
                   <button
                     key={tipe}
                     type="button"
                     onClick={() => setReportConfig((prev) => ({ ...prev, tipe }))}
-                    className={`py-2.5 text-xs font-bold rounded-lg capitalize transition-all cursor-pointer text-center ${
+                    className={`py-2 text-xs font-bold rounded-lg capitalize transition-all cursor-pointer text-center ${
                       reportConfig.tipe === tipe
                         ? 'bg-emerald-700 text-white shadow-md'
                         : 'text-stone-400 hover:text-white hover:bg-stone-800'
                     }`}
                   >
-                    {tipe}
+                    {tipe === 'semua' ? `Semua (${entries.length})` : tipe}
                   </button>
                 ))}
               </div>
@@ -1315,12 +1370,23 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         )}
       </div>
 
-      {/* Compact Real-Time Sync Indicator (Slim single-line to avoid taking up vertical space) */}
-      <div className="bg-emerald-950/70 border border-emerald-500/30 rounded-xl px-4 py-2 text-xs text-emerald-200 flex items-center gap-2 shadow-sm no-print">
-        <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
-        <span>
-          <strong>Sinkronisasi Otomatis:</strong> {filteredEntries.length} data kegiatan &amp; {defaultPhotos.length} foto dokumentasi periode {periodText} termuat rapi.
-        </span>
+      {/* Compact Real-Time Sync Indicator */}
+      <div className="bg-emerald-950/80 border border-emerald-500/40 rounded-xl px-4 py-2.5 text-xs text-emerald-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm no-print">
+        <div className="flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+          <span>
+            <strong>Status Laporan:</strong> Menampilkan <strong>{filteredEntries.length} kegiatan</strong> &amp; <strong>{defaultPhotos.length} foto</strong> (dari total <strong>{entries.length}</strong> logbook tersimpan).
+          </span>
+        </div>
+        {reportConfig.tipe !== 'semua' && entries.length > filteredEntries.length && (
+          <button
+            type="button"
+            onClick={() => setReportConfig((prev) => ({ ...prev, tipe: 'semua' }))}
+            className="text-[11px] font-bold text-amber-300 hover:text-white bg-black/50 hover:bg-emerald-800 px-3 py-1 rounded-lg border border-amber-500/40 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
+          >
+            Tampilkan Seluruh {entries.length} Catatan Sekaligus ↗
+          </button>
+        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1470,14 +1536,14 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
         {/* ==================== PAGE 3+: BAB II AKUNTABILITAS KINERJA (TABEL 1) ==================== */}
         {table1Pages.map((pageRows, pageIdx) => {
-          const globalStartIndex = pageIdx * 10;
+          const globalStartIndex = pageIdx === 0 ? 0 : 7 + (pageIdx - 1) * 9;
 
           return (
             <div key={`table1-page-${pageIdx}`} className="relative">
               <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
                 — Halaman {3 + pageIdx}: BAB II Akuntabilitas Kinerja (Tabel 1{pageIdx > 0 ? ' Lanjutan' : ''}) —
               </div>
-              <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
+              <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 page-break">
                 {pageIdx === 0 && (
                   <div className="text-center mb-6">
                     <h2 className="text-lg font-bold uppercase tracking-wider">BAB II</h2>
@@ -1502,34 +1568,34 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                     </div>
                   )}
 
-                  {/* Official Table 1 with strict black borders and consistent column ratios */}
-                  <div className="border border-stone-900">
-                    <table className="w-full text-left text-[11pt] border-collapse table-fixed" style={{ width: '100%', tableLayout: 'fixed' }}>
+                  {/* Official Table 1 with strict solid black borders and explicit cell constraints */}
+                  <div style={{ border: '1px solid #000000', width: '100%', boxSizing: 'border-box' }}>
+                    <table className="w-full text-left text-[11pt] border-collapse font-sans" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', border: '1px solid #000000' }}>
                       <thead>
-                        <tr className="border-b border-stone-900 bg-stone-100 font-bold">
-                          <th className="border-r border-stone-900 p-2 text-center w-[8%]" style={{ width: '8%' }}>No.</th>
-                          <th className="border-r border-stone-900 p-2 text-center w-[22%]" style={{ width: '22%' }}>
-                            {reportConfig.tipe === 'bulanan'
+                        <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #000000' }} className="font-bold">
+                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '8%', boxSizing: 'border-box' }}>No.</th>
+                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '22%', boxSizing: 'border-box' }}>
+                            {reportConfig.tipe === 'bulanan' || reportConfig.tipe === 'semua'
                               ? 'Tanggal'
                               : reportConfig.tipe === 'triwulan'
                               ? 'Bulan'
                               : 'Periode'}
                           </th>
-                          <th className="border-r border-stone-900 p-2 text-center w-[54%]" style={{ width: '54%' }}>
+                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '54%', boxSizing: 'border-box' }}>
                             Rincian Pekerjaan
                           </th>
-                          <th className="p-2 text-center w-[16%]" style={{ width: '16%' }}>Keterangan</th>
+                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '16%', boxSizing: 'border-box' }}>Keterangan</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pageRows.map((row, rowIdx) => {
                           const actualIdx = globalStartIndex + rowIdx;
                           return (
-                            <tr key={actualIdx} className="border-b border-stone-900 align-top">
-                              <td className="border-r border-stone-900 p-2.5 text-center font-medium break-words">
+                            <tr key={actualIdx} style={{ borderBottom: '1px solid #000000' }} className="align-top">
+                              <td style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', wordBreak: 'break-word', boxSizing: 'border-box' }} className="font-medium">
                                 {actualIdx + 1}
                               </td>
-                              <td className="border-r border-stone-900 p-2.5 font-semibold text-center break-words">
+                              <td style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', wordBreak: 'break-word', boxSizing: 'border-box' }} className="font-semibold">
                                 {isEditMode ? (
                                   <input
                                     type="text"
@@ -1546,7 +1612,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                   row.label
                                 )}
                               </td>
-                              <td className="border-r border-stone-900 p-2.5 space-y-1.5 break-words">
+                              <td style={{ border: '1px solid #000000', padding: '8px', wordBreak: 'break-word', boxSizing: 'border-box' }} className="space-y-1.5">
                                 {isEditMode ? (
                                   <textarea
                                     rows={2}
@@ -1568,7 +1634,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                   ))
                                 )}
                               </td>
-                              <td className="p-2.5 text-center text-[11px] text-stone-700">
+                              <td style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', fontSize: '11px', wordBreak: 'break-word', boxSizing: 'border-box' }} className="text-stone-700">
                                 {isEditMode ? (
                                   <input
                                     type="text"
@@ -1730,28 +1796,30 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                     </div>
 
                     {/* Table 2 layout with 2 photos per sheet */}
-                    <div className="border border-stone-900">
-                      <table className="w-full text-left text-[11pt] border-collapse table-fixed font-sans" style={{ width: '100%', tableLayout: 'fixed' }}>
+                    <div style={{ border: '1px solid #000000', width: '100%', boxSizing: 'border-box' }}>
+                      <table className="w-full text-left text-[11pt] border-collapse font-sans" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', border: '1px solid #000000' }}>
                         <thead>
-                          <tr className="border-b border-stone-900 bg-stone-100 font-bold text-[11pt]">
-                            <th className="border-r border-stone-900 p-2.5 text-center w-[48%]" style={{ width: '48%' }}>
+                          <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #000000' }} className="font-bold text-[11pt]">
+                            <th style={{ border: '1px solid #000000', padding: '10px', textAlign: 'center', width: '48%', boxSizing: 'border-box' }}>
                               Foto Dokumentasi
                             </th>
-                            <th className="p-2.5 text-center w-[52%]" style={{ width: '52%' }}>Keterangan</th>
+                            <th style={{ border: '1px solid #000000', padding: '10px', textAlign: 'center', width: '52%', boxSizing: 'border-box' }}>
+                              Keterangan
+                            </th>
                           </tr>
                         </thead>
                         <tbody>
                           {pagePhotos.map((doc, docIdx) => {
                             const actualIdx = globalStartIndex + docIdx;
                             return (
-                              <tr key={doc.id || actualIdx} className="border-b border-stone-900 align-middle">
+                              <tr key={doc.id || actualIdx} style={{ borderBottom: '1px solid #000000' }} className="align-middle">
                                 {/* Foto Cell with Clean Container */}
-                                <td className="border-r border-stone-900 p-3 sm:p-4 text-center bg-white w-[48%]">
-                                  <div className="relative max-w-[270px] mx-auto overflow-hidden border border-stone-700 bg-stone-50 flex items-center justify-center min-h-[160px] max-h-[195px] group">
+                                <td style={{ border: '1px solid #000000', padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle', width: '48%', backgroundColor: '#ffffff', boxSizing: 'border-box' }}>
+                                  <div style={{ width: '260px', height: '170px', maxWidth: '100%', margin: '0 auto', border: '1px solid #555555', backgroundColor: '#f8fafc', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', position: 'relative' }} className="group">
                                     <img
                                       src={doc.foto}
                                       alt={`Dokumentasi ${actualIdx + 1}`}
-                                      className="w-full h-auto object-contain max-h-[190px] block mx-auto"
+                                      style={{ maxWidth: '100%', maxHeight: '100%', width: 'auto', height: 'auto', objectFit: 'contain', display: 'block', margin: '0 auto' }}
                                     />
 
                                     {/* Direct image edit buttons on hover */}
@@ -1801,7 +1869,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                 </td>
 
                                 {/* Keterangan Cell */}
-                                <td className="p-4 leading-relaxed align-top bg-white">
+                                <td style={{ border: '1px solid #000000', padding: '14px', verticalAlign: 'top', width: '52%', backgroundColor: '#ffffff', boxSizing: 'border-box' }} className="leading-relaxed">
                                   {isEditMode ? (
                                     <div className="space-y-2">
                                       <label className="block text-[11px] font-semibold text-stone-600 font-sans">

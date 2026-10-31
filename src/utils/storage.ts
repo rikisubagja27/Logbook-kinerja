@@ -433,13 +433,17 @@ export function loadNipDirectory(): UserProfile[] {
     const currentRaw = localStorage.getItem(NIP_DIRECTORY_STORAGE_KEY) || oldRaw;
 
     if (!currentRaw) {
-      saveNipDirectory(PRESEEDED_OFFICER_ROSTER);
+      try {
+        localStorage.setItem(NIP_DIRECTORY_STORAGE_KEY, JSON.stringify(PRESEEDED_OFFICER_ROSTER));
+      } catch {}
       return PRESEEDED_OFFICER_ROSTER;
     }
 
     const stored: UserProfile[] = JSON.parse(currentRaw);
     if (!Array.isArray(stored)) {
-      saveNipDirectory(PRESEEDED_OFFICER_ROSTER);
+      try {
+        localStorage.setItem(NIP_DIRECTORY_STORAGE_KEY, JSON.stringify(PRESEEDED_OFFICER_ROSTER));
+      } catch {}
       return PRESEEDED_OFFICER_ROSTER;
     }
 
@@ -455,8 +459,10 @@ export function loadNipDirectory(): UserProfile[] {
       filtered.unshift(DEFAULT_USER_PROFILE);
     }
 
-    // Save cleaned roster back
-    saveNipDirectory(filtered);
+    // Save cleaned roster back quietly to localStorage
+    try {
+      localStorage.setItem(NIP_DIRECTORY_STORAGE_KEY, JSON.stringify(filtered));
+    } catch {}
     return filtered;
   } catch (err) {
     console.error('Error loading NIP directory:', err);
@@ -474,7 +480,9 @@ if (rosterBroadcast) {
     if (event.data?.type === 'ROSTER_UPDATED' && Array.isArray(event.data?.roster)) {
       try {
         localStorage.setItem(NIP_DIRECTORY_STORAGE_KEY, JSON.stringify(event.data.roster));
-        window.dispatchEvent(new CustomEvent('kps-nip-directory-updated', { detail: event.data.roster }));
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('kps-nip-directory-updated', { detail: event.data.roster }));
+        }, 0);
       } catch {}
     }
   };
@@ -497,9 +505,11 @@ export function saveNipDirectory(directory: UserProfile[]): void {
     rosterBroadcast?.postMessage({ type: 'ROSTER_UPDATED', roster: directory });
   } catch {}
 
-  // 3. Dispatch local event for instant reactive UI re-render
+  // 3. Dispatch local event asynchronously so it never interrupts React render cycles
   if (typeof window !== 'undefined') {
-    window.dispatchEvent(new CustomEvent('kps-nip-directory-updated', { detail: directory }));
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('kps-nip-directory-updated', { detail: directory }));
+    }, 0);
   }
 }
 

@@ -43,7 +43,7 @@ export interface UserProfile {
   email: string;
 }
 
-export type ReportType = 'bulanan' | 'triwulan' | 'tahunan';
+export type ReportType = 'bulanan' | 'triwulan' | 'tahunan' | 'semua';
 
 export interface ReportConfig {
   tipe: ReportType;

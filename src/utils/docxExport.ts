@@ -26,6 +26,9 @@ const MONTH_NAMES = [
 const ROMAN_QUARTERS = ['I', 'II', 'III', 'IV'];
 
 export function getReportPeriodTitle(config: ReportConfig): string {
+  if (config.tipe === 'semua') {
+    return `SELURUH CATATAN LOGBOOK KINERJA TAHUN ${config.tahun}`;
+  }
   if (config.tipe === 'bulanan') {
     return `BULAN ${MONTH_NAMES[config.bulan - 1]?.toUpperCase()} TAHUN ${config.tahun}`;
   }
@@ -36,6 +39,9 @@ export function getReportPeriodTitle(config: ReportConfig): string {
 }
 
 export function getReportPeriodText(config: ReportConfig): string {
+  if (config.tipe === 'semua') {
+    return `seluruh catatan logbook kinerja Tahun ${config.tahun}`;
+  }
   if (config.tipe === 'bulanan') {
     return `Bulan ${MONTH_NAMES[config.bulan - 1]} Tahun ${config.tahun}`;
   }
@@ -128,6 +134,10 @@ export async function exportReportToDocx(
       const entryYear = d.getFullYear();
       const entryMonth = d.getMonth() + 1;
 
+      if (config.tipe === 'semua') {
+        return true;
+      }
+
       if (entryYear !== config.tahun) return false;
 
       if (config.tipe === 'bulanan') {
@@ -200,7 +210,7 @@ export async function exportReportToDocx(
         keterangan: '-',
       });
     });
-  } else if (config.tipe === 'bulanan') {
+  } else if (config.tipe === 'bulanan' || config.tipe === 'semua') {
     // For bulanan, show entries in detail
     filtered.forEach((e) => {
       const d = new Date(e.tanggal);

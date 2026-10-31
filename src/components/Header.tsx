@@ -59,8 +59,8 @@ export function Header({
     setIsNipModalOpen(false);
   };
 
-  // Komponen Profil di Pojok Kanan Atas: Foto tanpa frame luar pembungkus, di bawahnya Icon Hijau Aktif & Nama & tombol ganti NIP
-  const UserProfileBadge = () => (
+  // Element Profil di Pojok Kanan Atas: Foto tanpa frame luar pembungkus, di bawahnya Icon Hijau Aktif & Nama & tombol ganti NIP
+  const userProfileBadgeElement = (
     <div className="flex items-center gap-2">
       <button
         type="button"
@@ -123,7 +123,7 @@ export function Header({
 
             {/* Profil di Pojok Kanan Atas untuk Layar Mobile */}
             <div className="md:hidden">
-              <UserProfileBadge />
+              {userProfileBadgeElement}
             </div>
           </div>
 
@@ -213,7 +213,7 @@ export function Header({
 
           {/* Profil di Pojok Kanan Atas untuk Layar Desktop (md ke atas) */}
           <div className="hidden md:flex items-center">
-            <UserProfileBadge />
+            {userProfileBadgeElement}
           </div>
 
         </div>
