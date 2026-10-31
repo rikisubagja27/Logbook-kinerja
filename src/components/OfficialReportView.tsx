@@ -788,44 +788,47 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       allowTaint: true,
       logging: false,
       backgroundColor: '#ffffff',
+      scrollX: 0,
+      scrollY: 0,
+      x: 0,
+      y: 0,
       windowWidth: 794,
       windowHeight: 1123,
       width: 794,
       height: 1123,
       onclone: (clonedDoc) => {
-        // 1. Hide ALL other report pages in cloned document so pageIndex is completely isolated!
+        // Find target page among cloned pages
         const allClonedPages = clonedDoc.querySelectorAll<HTMLElement>('.report-page');
-        allClonedPages.forEach((p, idx) => {
-          if (idx !== pageIndex) {
-            p.style.display = 'none';
-          }
-        });
-
-        // 2. Hide all non-report elements: headers, banners, buttons, debug bars, floating controls
-        const nonReportElements = clonedDoc.querySelectorAll<HTMLElement>(
-          'header, footer, nav, aside, button, input[type="file"], .no-print, [data-no-print]'
-        );
-        nonReportElements.forEach((el) => {
-          el.style.display = 'none';
-        });
-
-        // 3. Reset all parent wrappers of the active page so it sits cleanly at (0, 0)
         const targetPage = allClonedPages[pageIndex];
+
         if (targetPage) {
-          let curr: HTMLElement | null = targetPage.parentElement;
-          while (curr && curr !== clonedDoc.body) {
-            curr.style.margin = '0';
-            curr.style.padding = '0';
-            curr.style.width = '794px';
-            curr.style.maxWidth = '794px';
-            curr.style.border = 'none';
-            curr.style.boxShadow = 'none';
-            curr.style.backgroundColor = '#ffffff';
-            curr = curr.parentElement;
-          }
+          // Empty cloned body completely and mount ONLY targetPage at absolute (0, 0)
+          clonedDoc.body.innerHTML = '';
+          clonedDoc.body.appendChild(targetPage);
+
+          clonedDoc.documentElement.style.margin = '0';
+          clonedDoc.documentElement.style.padding = '0';
+          clonedDoc.documentElement.style.width = '794px';
+          clonedDoc.documentElement.style.minWidth = '794px';
+          clonedDoc.documentElement.style.maxWidth = '794px';
+          clonedDoc.documentElement.style.height = '1123px';
+          clonedDoc.documentElement.style.overflow = 'hidden';
+          clonedDoc.documentElement.style.backgroundColor = '#ffffff';
+
+          clonedDoc.body.style.margin = '0';
+          clonedDoc.body.style.padding = '0';
+          clonedDoc.body.style.width = '794px';
+          clonedDoc.body.style.minWidth = '794px';
+          clonedDoc.body.style.maxWidth = '794px';
+          clonedDoc.body.style.height = '1123px';
+          clonedDoc.body.style.overflow = 'hidden';
+          clonedDoc.body.style.backgroundColor = '#ffffff';
 
           // Force strict A4 794px x 1123px dimensions and pristine paper styling
           targetPage.style.display = targetPage.classList.contains('report-cover-page') ? 'flex' : 'block';
+          targetPage.style.position = 'absolute';
+          targetPage.style.top = '0';
+          targetPage.style.left = '0';
           targetPage.style.width = '794px';
           targetPage.style.minWidth = '794px';
           targetPage.style.maxWidth = '794px';
@@ -876,17 +879,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           });
         }
 
-        // 4. Reset document body and viewport scroll
-        clonedDoc.body.style.margin = '0';
-        clonedDoc.body.style.padding = '0';
-        clonedDoc.body.style.width = '794px';
-        clonedDoc.body.style.backgroundColor = '#ffffff';
-        clonedDoc.documentElement.style.margin = '0';
-        clonedDoc.documentElement.style.padding = '0';
-        clonedDoc.documentElement.style.backgroundColor = '#ffffff';
+        // Reset document scroll
         clonedDoc.defaultView?.scrollTo(0, 0);
 
-        // 5. Sanitize fonts and OKLCH colors
+        // Sanitize fonts and OKLCH colors
         sanitizeReportClonedDoc(clonedDoc);
       },
     });
@@ -1116,6 +1112,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       };
 
       await exportReportToDocx(reportConfig, profile, entries, customData);
+      displayPhotoToast('File Word (.docx) berhasil diunduh ke folder Download HP Anda! Silakan buka dengan WPS Office atau MS Word.');
     } catch (err: any) {
       alert('Gagal mengekspor dokumen Word: ' + err.message);
     } finally {
@@ -1390,28 +1387,29 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       </div>
 
       {/* ========================================================================= */}
-      {/* AUTHENTIC OFFICIAL A4 REPORT SHEETS CONTAINER */}
+      {/* AUTHENTIC OFFICIAL A4 REPORT SHEETS CONTAINER (FIXED 794px A4 PROPORTIONS) */}
       {/* ========================================================================= */}
-      <div ref={reportContainerRef} className="space-y-10 print:space-y-0 text-stone-900 font-sans">
-        
-        {/* ==================== PAGE 1: COVER (SAMPUL LAPORAN) ==================== */}
-        <div className="relative">
-          <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
-            — Halaman 1: Sampul Laporan Resmi —
-          </div>
-          <div 
-            className="report-page report-cover-page bg-white w-full max-w-[794px] min-h-[1050px] sm:min-h-[1123px] mx-auto p-10 sm:p-14 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0"
-            style={{
-              display: 'flex',
-              flexDirection: 'column',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-              textAlign: 'center',
-              boxSizing: 'border-box',
-              padding: '48px 40px',
-              backgroundColor: '#ffffff'
-            }}
-          >
+      <div className="w-full overflow-x-auto pb-8 scrollbar-thin">
+        <div ref={reportContainerRef} className="w-[794px] min-w-[794px] mx-auto space-y-10 print:space-y-0 text-stone-900 font-sans">
+          
+          {/* ==================== PAGE 1: COVER (SAMPUL LAPORAN) ==================== */}
+          <div className="relative">
+            <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
+              — Halaman 1: Sampul Laporan Resmi —
+            </div>
+            <div 
+              className="report-page report-cover-page bg-white w-[794px] min-w-[794px] max-w-[794px] h-[1123px] min-h-[1123px] max-h-[1123px] mx-auto p-10 sm:p-14 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-center print:shadow-none print:border-none print:m-0"
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                textAlign: 'center',
+                boxSizing: 'border-box',
+                padding: '48px 40px',
+                backgroundColor: '#ffffff'
+              }}
+            >
             <div style={{ textAlign: 'center', width: '100%' }} className="space-y-2 mt-2">
               <h1 style={{ textAlign: 'center' }} className="text-xl sm:text-2xl font-bold uppercase tracking-wide leading-snug">
                 LAPORAN KINERJA
@@ -1463,7 +1461,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman 2: BAB I Pendahuluan —
           </div>
-          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
+          <div className="report-page bg-white w-[794px] min-w-[794px] max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 page-break">
             <div className="text-center mb-8">
               <h2 className="text-lg font-bold uppercase tracking-wider">BAB I</h2>
               <h3 className="text-lg font-bold uppercase tracking-wider">PENDAHULUAN</h3>
@@ -1543,7 +1541,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
                 — Halaman {3 + pageIdx}: BAB II Akuntabilitas Kinerja (Tabel 1{pageIdx > 0 ? ' Lanjutan' : ''}) —
               </div>
-              <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 page-break">
+              <div className="report-page bg-white w-[794px] min-w-[794px] max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 page-break">
                 {pageIdx === 0 && (
                   <div className="text-center mb-6">
                     <h2 className="text-lg font-bold uppercase tracking-wider">BAB II</h2>
@@ -1690,7 +1688,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
             <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
               — Halaman {3 + table1Pages.length}: Tabel 2 Dokumentasi Kegiatan —
             </div>
-            <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
+            <div className="report-page bg-white w-[794px] min-w-[794px] max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 text-justify leading-relaxed print:shadow-none print:border-none print:m-0 page-break">
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
@@ -1735,7 +1733,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                 <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
                   — Halaman {3 + table1Pages.length + pageIdx}: Tabel 2 Dokumentasi Kegiatan{pageIdx > 0 ? ' (Lanjutan)' : ''} —
                 </div>
-                <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
+                <div className="report-page bg-white w-[794px] min-w-[794px] max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 leading-relaxed print:shadow-none print:border-none print:m-0 page-break">
                   <div className="space-y-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
                       <div>
@@ -1938,7 +1936,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           <div className="no-print print:hidden text-center text-xs font-mono font-semibold text-stone-300 mb-2">
             — Halaman Terakhir: BAB III Penutup & Lembar Pengesahan —
           </div>
-          <div className="report-page bg-white w-full max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-justify leading-relaxed print:shadow-none print:border-none print:m-0  page-break">
+          <div className="report-page bg-white w-[794px] min-w-[794px] max-w-[794px] min-h-[1123px] mx-auto p-12 sm:p-16 shadow-2xl border border-stone-300/80 flex flex-col justify-between text-justify leading-relaxed print:shadow-none print:border-none print:m-0 page-break">
             <div>
               <div className="text-center mb-8">
                 <h2 className="text-lg font-bold uppercase tracking-wider">BAB III</h2>
@@ -2001,6 +1999,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
           </div>
         </div>
 
+        </div>
       </div>
 
       {/* ==================== MODAL 1: UJI RENDER PDF DIAGNOSTIK ==================== */}

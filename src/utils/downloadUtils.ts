@@ -19,10 +19,20 @@ export async function downloadOrShareBlob(
 
   const isMobile = isIOS || /Android/.test(navigator.userAgent);
 
-  // 1. On Mobile devices and Standalone PWA, prioritize Web Share API with File
-  if ((isMobile || isStandalone) && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+  // 1. In iOS Standalone PWA mode only, synthetic <a download> is blocked by WebKit, so Web Share is required
+  if (isIOS && isStandalone && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
     try {
-      const mimeType = blob.type || (filename.endsWith('.pdf') ? 'application/pdf' : 'application/octet-stream');
+      let mimeType = blob.type;
+      if (!mimeType || mimeType === 'application/octet-stream') {
+        if (filename.endsWith('.docx')) {
+          mimeType = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+        } else if (filename.endsWith('.pdf')) {
+          mimeType = 'application/pdf';
+        } else {
+          mimeType = 'application/octet-stream';
+        }
+      }
+
       const file = new File([blob], filename, {
         type: mimeType,
         lastModified: Date.now(),
@@ -37,15 +47,14 @@ export async function downloadOrShareBlob(
         return;
       }
     } catch (err: any) {
-      // User tapped "Batal" (Cancel) on iOS Share sheet - normal behavior, do not trigger fallback error
       if (err.name === 'AbortError') {
         return;
       }
-      console.warn('Web Share API error, using standard download fallback:', err);
+      console.warn('iOS Standalone Web Share failed, attempting anchor fallback:', err);
     }
   }
 
-  // 2. Standard browser anchor download
+  // 2. Standard direct file download to device Downloads folder (Android, iOS Safari, Tablet, PC)
   try {
     const blobUrl = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -61,7 +70,7 @@ export async function downloadOrShareBlob(
         document.body.removeChild(link);
       }
       URL.revokeObjectURL(blobUrl);
-    }, 5000);
+    }, 15000);
     return;
   } catch (err) {
     console.error('Standard anchor download failed:', err);
