@@ -65,10 +65,12 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'c
           type="button"
           onClick={handleInstallClick}
           disabled={isInstalling}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-800/90 hover:bg-emerald-700 text-white text-xs font-bold transition-all border border-emerald-400/40 shadow-xs cursor-pointer active:scale-95"
+          className="group flex items-center gap-2 px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl bg-emerald-900/40 hover:bg-emerald-800/60 text-emerald-100 hover:text-white text-xs sm:text-[13px] font-semibold transition-all border border-emerald-500/40 shadow-xs cursor-pointer active:scale-95 shrink-0"
           title="Pasang aplikasi ke layar utama (tanpa address bar browser)"
         >
-          <Download className="w-3.5 h-3.5 text-amber-300" />
+          <span className="w-6 h-6 rounded-md bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center shrink-0 group-hover:bg-emerald-500/30 transition-colors">
+            <Download className="w-3.5 h-3.5 text-amber-300 stroke-[2.2]" />
+          </span>
           <span className="hidden sm:inline">Pasang</span>
           <span>Aplikasi</span>
         </button>

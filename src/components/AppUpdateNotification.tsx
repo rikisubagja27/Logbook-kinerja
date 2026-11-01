@@ -121,10 +121,12 @@ export const ManualRefreshAppButton: React.FC<{
         <button
           type="button"
           onClick={() => setShowConfirmModal(true)}
-          className={`relative px-2.5 py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-stone-200 hover:text-white text-xs font-semibold transition flex items-center gap-1.5 cursor-pointer border border-stone-700/60 active:scale-95 ${className}`}
+          className={`group relative px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl bg-stone-900/90 hover:bg-stone-800 text-stone-200 hover:text-white text-xs sm:text-[13px] font-semibold transition-all flex items-center gap-2 cursor-pointer border border-stone-700/60 shadow-xs active:scale-95 shrink-0 ${className}`}
           title="Segarkan / Perbarui Aplikasi ke Versi Terbaru (Data Tetap Aman)"
         >
-          <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 ${isRefreshing ? 'animate-spin' : ''}`} />
+          <span className="w-6 h-6 rounded-md bg-stone-800 border border-stone-700/60 flex items-center justify-center shrink-0 group-hover:text-emerald-300 group-hover:border-emerald-500/40 transition-colors">
+            <RefreshCw className={`w-3.5 h-3.5 text-emerald-400 stroke-[2.2] ${isRefreshing ? 'animate-spin' : ''}`} />
+          </span>
           <span className="hidden sm:inline">Perbarui</span>
           
           {needRefresh && (

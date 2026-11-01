@@ -7,7 +7,9 @@ import {
   User, 
   ChevronDown, 
   CheckCircle2, 
-  PlusCircle, 
+  PenLine, 
+  ClipboardList,
+  FileCheck2,
   RefreshCw, 
   X, 
   Building2, 
@@ -15,9 +17,10 @@ import {
   ExternalLink,
   ShieldCheck,
   Sparkles,
-  FileSpreadsheet,
-  FileText,
-  Cloud
+  Cloud,
+  IdCard,
+  UserCheck,
+  PlusCircle
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -130,98 +133,158 @@ export function Header({
             </div>
           </div>
 
-          {/* Bagian Menu Navigasi Utama: Menu Isi Logbook & Rekap Logbook Dipisahkan Mandiri */}
-          <nav aria-label="Menu Navigasi Utama" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium overflow-x-auto w-full md:w-auto justify-start md:justify-center pb-1 md:pb-0">
+          {/* Bagian Menu Navigasi Utama: Menu Mandiri dengan Ikon Profesional Modern */}
+          <nav 
+            aria-label="Menu Navigasi Utama" 
+            className="flex items-center gap-1 sm:gap-1.5 p-1 bg-stone-950/80 border border-stone-800/90 rounded-xl sm:rounded-2xl shadow-inner backdrop-blur-md overflow-x-auto w-full md:w-auto justify-start md:justify-center scrollbar-none"
+          >
             
             {/* Menu Mandiri: Isi Logbook */}
             <button
               type="button"
               onClick={() => setActiveTab('form')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
+              className={`group relative px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 font-medium text-xs sm:text-[13px] ${
                 activeTab === 'form' 
-                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
-                  : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+                  ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/40 font-semibold' 
+                  : 'text-stone-300 hover:text-white hover:bg-stone-800/80 border border-transparent'
               }`}
               title="Menu Form: Isi Catatan Logbook Kinerja Harian"
             >
-              <PlusCircle className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>Isi Logbook</span>
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                activeTab === 'form'
+                  ? 'bg-emerald-500/30 text-emerald-100 shadow-inner'
+                  : 'bg-stone-800/90 text-stone-400 border border-stone-700/60 group-hover:text-emerald-300 group-hover:bg-stone-800 group-hover:border-emerald-500/40'
+              }`}>
+                <PenLine className="w-3.5 h-3.5 stroke-[2.2]" />
+              </span>
+              <span className="tracking-tight">Isi Logbook</span>
+              {activeTab === 'form' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 shadow-xs shadow-emerald-300 shrink-0" />
+              )}
             </button>
 
             {/* Menu Mandiri: Rekap Logbook */}
             <button
               type="button"
               onClick={() => setActiveTab('list')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
+              className={`group relative px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 font-medium text-xs sm:text-[13px] ${
                 activeTab === 'list' 
-                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
-                  : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+                  ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/40 font-semibold' 
+                  : 'text-stone-300 hover:text-white hover:bg-stone-800/80 border border-transparent'
               }`}
               title="Menu Rekap: Riwayat & Rekap Seluruh Catatan Logbook"
             >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>Rekap Logbook</span>
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                activeTab === 'list'
+                  ? 'bg-emerald-500/30 text-emerald-100 shadow-inner'
+                  : 'bg-stone-800/90 text-stone-400 border border-stone-700/60 group-hover:text-emerald-300 group-hover:bg-stone-800 group-hover:border-emerald-500/40'
+              }`}>
+                <ClipboardList className="w-3.5 h-3.5 stroke-[2.2]" />
+              </span>
+              <span className="tracking-tight">Rekap Logbook</span>
+              {activeTab === 'list' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 shadow-xs shadow-emerald-300 shrink-0" />
+              )}
             </button>
 
             {/* Menu Mandiri: Laporan Resmi */}
             <button
               type="button"
               onClick={() => setActiveTab('report')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
+              className={`group relative px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 font-medium text-xs sm:text-[13px] ${
                 activeTab === 'report' 
-                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
-                  : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+                  ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/40 font-semibold' 
+                  : 'text-stone-300 hover:text-white hover:bg-stone-800/80 border border-transparent'
               }`}
               title="Menu Laporan Resmi: Cetak PDF & Ekspor Word Dokumen"
             >
-              <FileText className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>Laporan Resmi</span>
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                activeTab === 'report'
+                  ? 'bg-emerald-500/30 text-emerald-100 shadow-inner'
+                  : 'bg-stone-800/90 text-stone-400 border border-stone-700/60 group-hover:text-emerald-300 group-hover:bg-stone-800 group-hover:border-emerald-500/40'
+              }`}>
+                <FileCheck2 className="w-3.5 h-3.5 stroke-[2.2]" />
+              </span>
+              <span className="tracking-tight">Laporan Resmi</span>
+              {activeTab === 'report' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 shadow-xs shadow-emerald-300 shrink-0" />
+              )}
             </button>
 
             {/* Menu Sinkronisasi Cloud Antarperangkat */}
             <button
               type="button"
               onClick={() => setActiveTab('cloudsync')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
+              className={`group relative px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 font-medium text-xs sm:text-[13px] ${
                 activeTab === 'cloudsync'
-                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400'
-                  : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+                  ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/40 font-semibold'
+                  : 'text-stone-300 hover:text-white hover:bg-stone-800/80 border border-transparent'
               }`}
               title="Menu Sinkronisasi Cloud Antarperangkat & Status Akun"
             >
-              <Cloud className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>Sinkron Cloud</span>
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                activeTab === 'cloudsync'
+                  ? 'bg-emerald-500/30 text-emerald-100 shadow-inner'
+                  : 'bg-stone-800/90 text-stone-400 border border-stone-700/60 group-hover:text-emerald-300 group-hover:bg-stone-800 group-hover:border-emerald-500/40'
+              }`}>
+                <Cloud className="w-3.5 h-3.5 stroke-[2.2]" />
+              </span>
+              <span className="tracking-tight">Sinkron Cloud</span>
+              {activeTab === 'cloudsync' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 shadow-xs shadow-emerald-300 shrink-0" />
+              )}
             </button>
 
             {/* Menu E-Personal & Data NIP */}
             <button
               type="button"
               onClick={() => setActiveTab('epersonal')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
+              className={`group relative px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 font-medium text-xs sm:text-[13px] ${
                 activeTab === 'epersonal' 
-                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
-                  : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+                  ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/40 font-semibold' 
+                  : 'text-stone-300 hover:text-white hover:bg-stone-800/80 border border-transparent'
               }`}
               title="Portal SIMPEG E-Personal & Data NIP Pegawai"
             >
-              <Building2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>Data NIP</span>
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                activeTab === 'epersonal'
+                  ? 'bg-emerald-500/30 text-emerald-100 shadow-inner'
+                  : 'bg-stone-800/90 text-stone-400 border border-stone-700/60 group-hover:text-emerald-300 group-hover:bg-stone-800 group-hover:border-emerald-500/40'
+              }`}>
+                <IdCard className="w-3.5 h-3.5 stroke-[2.2]" />
+              </span>
+              <span className="tracking-tight">Data NIP</span>
+              {activeTab === 'epersonal' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 shadow-xs shadow-emerald-300 shrink-0" />
+              )}
             </button>
 
             {/* Menu Profil Pegawai */}
             <button
               type="button"
               onClick={() => setActiveTab('profile')}
-              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
+              className={`group relative px-2.5 sm:px-3 py-1.5 rounded-lg sm:rounded-xl transition-all duration-150 flex items-center gap-2 cursor-pointer whitespace-nowrap shrink-0 font-medium text-xs sm:text-[13px] ${
                 activeTab === 'profile' 
-                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
-                  : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+                  ? 'bg-gradient-to-b from-emerald-600 to-emerald-700 text-white shadow-md shadow-emerald-950/60 border border-emerald-400/40 font-semibold' 
+                  : 'text-stone-300 hover:text-white hover:bg-stone-800/80 border border-transparent'
               }`}
               title="Menu Pengaturan Profil Pegawai"
             >
-              <User className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
-              <span>Profil</span>
+              <span className={`w-6 h-6 rounded-md flex items-center justify-center transition-all shrink-0 ${
+                activeTab === 'profile'
+                  ? 'bg-emerald-500/30 text-emerald-100 shadow-inner'
+                  : 'bg-stone-800/90 text-stone-400 border border-stone-700/60 group-hover:text-emerald-300 group-hover:bg-stone-800 group-hover:border-emerald-500/40'
+              }`}>
+                <UserCheck className="w-3.5 h-3.5 stroke-[2.2]" />
+              </span>
+              <span className="tracking-tight">Profil</span>
+              {activeTab === 'profile' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-300 shadow-xs shadow-emerald-300 shrink-0" />
+              )}
             </button>
+
+            {/* Pemisah Halus antara Menu Utama & Tombol Utilitas */}
+            <div className="h-5 w-px bg-stone-800/90 shrink-0 mx-0.5 hidden sm:block" />
 
             {/* Tombol Pasang Aplikasi Native / PWA */}
             <PWAInstallButton variant="compact" />
