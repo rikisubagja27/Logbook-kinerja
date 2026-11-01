@@ -15,7 +15,13 @@ import {
 import { downloadOrShareBlob } from './downloadUtils';
 import { LogbookEntry, UserProfile, ReportConfig } from '../types/logbook';
 import { base64ToUint8Array } from './imageUtils';
-import { formatAreaUnit } from './storage';
+import { 
+  formatAreaUnit, 
+  parseDateDetails, 
+  parseDateScore, 
+  parseTimeScore, 
+  normalizeLogbookEntry 
+} from './storage';
 
 const MONTH_NAMES = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -28,8 +34,7 @@ export function getReportPeriodTitle(config: ReportConfig, entries?: LogbookEntr
   if (config.tipe === 'semua') {
     if (entries && entries.length > 0) {
       const months = Array.from(new Set(entries.map((e) => {
-        const parts = (e.tanggal || '').split('-');
-        return parts.length >= 2 ? parseInt(parts[1], 10) : 0;
+        return parseDateDetails(e.tanggal).month;
       }).filter((m) => m > 0)));
       if (months.length === 1) {
         return `BULAN ${MONTH_NAMES[months[0] - 1]?.toUpperCase()} TAHUN ${config.tahun}`;
@@ -56,8 +61,7 @@ export function getReportPeriodText(config: ReportConfig, entries?: LogbookEntry
   if (config.tipe === 'semua') {
     if (entries && entries.length > 0) {
       const months = Array.from(new Set(entries.map((e) => {
-        const parts = (e.tanggal || '').split('-');
-        return parts.length >= 2 ? parseInt(parts[1], 10) : 0;
+        return parseDateDetails(e.tanggal).month;
       }).filter((m) => m > 0)));
       if (months.length === 1) {
         return `Bulan ${MONTH_NAMES[months[0] - 1]} Tahun ${config.tahun}`;
@@ -299,11 +303,13 @@ export async function exportReportToDocx(
   const periodText = getReportPeriodText(config, entries);
 
   // Filter entries according to config and sort chronologically from earliest to latest date (1 -> 31)
+  // Filter entries according to config and sort chronologically from earliest to latest date (1 -> 31)
   const filtered = entries
+    .map(normalizeLogbookEntry)
     .filter((e) => {
-      const d = new Date(e.tanggal);
-      const entryYear = d.getFullYear();
-      const entryMonth = d.getMonth() + 1;
+      const pd = parseDateDetails(e.tanggal);
+      const entryYear = pd.year;
+      const entryMonth = pd.month;
 
       if (config.tipe === 'semua') {
         return true;
@@ -326,12 +332,12 @@ export async function exportReportToDocx(
       return true;
     })
     .sort((a, b) => {
-      const dateDiff = a.tanggal.localeCompare(b.tanggal);
-      if (dateDiff !== 0) return dateDiff;
-      const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
-      const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
-      const timeDiff = timeA.localeCompare(timeB);
-      if (timeDiff !== 0) return timeDiff;
+      const scoreA = parseDateScore(a.tanggal);
+      const scoreB = parseDateScore(b.tanggal);
+      if (scoreA !== scoreB) return scoreA - scoreB;
+      const timeScoreA = parseTimeScore(a.waktuMulai);
+      const timeScoreB = parseTimeScore(b.waktuMulai);
+      if (timeScoreA !== timeScoreB) return timeScoreA - timeScoreB;
       return (a.createdAt || '').localeCompare(b.createdAt || '');
     });
 
@@ -355,7 +361,7 @@ export async function exportReportToDocx(
     }[config.triwulan] || [];
 
     quarterMonths.forEach((m) => {
-      const monthEntries = filtered.filter((e) => new Date(e.tanggal).getMonth() + 1 === m);
+      const monthEntries = filtered.filter((e) => parseDateDetails(e.tanggal).month === m);
       const items: string[] = [];
 
       monthEntries.forEach((e) => {
@@ -381,8 +387,8 @@ export async function exportReportToDocx(
     });
   } else if (config.tipe === 'bulanan' || config.tipe === 'semua') {
     filtered.forEach((e) => {
-      const d = new Date(e.tanggal);
-      const dateStr = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+      const pd = parseDateDetails(e.tanggal);
+      const dateStr = `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
       let itemDesc = '';
       if (e.kehadiran === 'Sakit') {
         itemDesc = `Izin Sakit: ${cleanDocxText(e.keterangan || 'Istirahat Sakit')}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
@@ -410,7 +416,7 @@ export async function exportReportToDocx(
     // Tahunan
     [1, 2, 3, 4].forEach((q) => {
       const qMonths = ({ 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] } as Record<number, number[]>)[q] || [];
-      const qEntries = filtered.filter((e) => qMonths.includes(new Date(e.tanggal).getMonth() + 1));
+      const qEntries = filtered.filter((e) => qMonths.includes(parseDateDetails(e.tanggal).month));
       const items = qEntries.map((e) => {
         if (e.kehadiran === 'Sakit') return `Izin Sakit: ${cleanDocxText(e.keterangan || '-')}`;
         if (e.kehadiran === 'Cuti') return `Cuti: ${cleanDocxText(e.keterangan || '-')}`;

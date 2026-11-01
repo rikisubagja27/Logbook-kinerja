@@ -5,6 +5,7 @@ import {
   LogbookEntry 
 } from '../types/logbook';
 import { resizeImageFile, formatBytes } from '../utils/imageUtils';
+import { normalizeDateString } from '../utils/storage';
 import { 
   Calendar, 
   Clock, 
@@ -381,7 +382,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
 
     const newEntry: LogbookEntry = {
       id: editingEntry?.id || `entry-${Date.now()}`,
-      tanggal,
+      tanggal: normalizeDateString(tanggal) || tanggal,
       kehadiran,
       waktuMulai: finalWaktuMulai,
       waktuSelesai: finalWaktuSelesai,

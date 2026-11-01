@@ -357,53 +357,149 @@ export const INITIAL_LOGBOOK_ENTRIES: LogbookEntry[] = [
   },
 ];
 
-export function parseDateScore(dateStr: string): number {
-  if (!dateStr) return 0;
-  const parts = dateStr.trim().split('-');
+export interface ParsedDateInfo {
+  year: number;
+  month: number; // 1 - 12
+  day: number;   // 1 - 31
+  formattedYMD: string; // "YYYY-MM-DD"
+  score: number; // YYYYMMDD numeric integer, e.g. 20260706
+}
+
+/**
+ * Pengurai tanggal komprehensif yang andal untuk berbagai format:
+ * YYYY-MM-DD, YYYY/MM/DD, DD-MM-YYYY, DD/MM/YYYY, ISO strings, dll.
+ * Mencegah pergeseran zona waktu (timezone shift) dan memastikan urutan kronologis 100% akurat.
+ */
+export function parseDateDetails(dateStr?: string): ParsedDateInfo {
+  if (!dateStr || typeof dateStr !== 'string') {
+    return { year: 1970, month: 1, day: 1, formattedYMD: '1970-01-01', score: 19700101 };
+  }
+
+  const trimmed = dateStr.trim();
+  // Pisahkan komponen tanggal murni dari bagian jam/waktu (misal "2026-07-06T12:00:00Z" atau "2026-07-06 07:30")
+  const dateOnly = trimmed.split(/[T\s]/)[0];
+
+  // Pisahkan dengan tanda strip, garis miring, atau titik: "-" atau "/" atau "."
+  const parts = dateOnly.split(/[-/.]/);
+
   if (parts.length === 3) {
-    const y = parseInt(parts[0], 10);
-    const m = parseInt(parts[1], 10);
-    const d = parseInt(parts[2], 10);
-    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
-      return y * 10000 + m * 100 + d;
+    const num0 = parseInt(parts[0], 10);
+    const num1 = parseInt(parts[1], 10);
+    const num2 = parseInt(parts[2], 10);
+
+    if (!isNaN(num0) && !isNaN(num1) && !isNaN(num2)) {
+      let y = num0;
+      let m = num1;
+      let d = num2;
+
+      // Kasus A: Format Standar YYYY-MM-DD (e.g. 2026-07-06)
+      if (num0 >= 1000) {
+        y = num0;
+        m = num1;
+        d = num2;
+      }
+      // Kasus B: Format Indonesia / Tanggal Terbalik DD-MM-YYYY (e.g. 06-07-2026)
+      else if (num2 >= 1000) {
+        y = num2;
+        m = num1;
+        d = num0;
+      }
+      // Kasus C: Tahun 2 digit di akhir (e.g. 06-07-26 -> 2026)
+      else if (num2 < 100 && num2 >= 20) {
+        y = 2000 + num2;
+        m = num1;
+        d = num0;
+      }
+
+      // Validasi batas nilai bulan (1-12) dan tanggal (1-31)
+      m = Math.max(1, Math.min(12, m));
+      d = Math.max(1, Math.min(31, d));
+
+      const yStr = String(y).padStart(4, '0');
+      const mStr = String(m).padStart(2, '0');
+      const dStr = String(d).padStart(2, '0');
+      const formattedYMD = `${yStr}-${mStr}-${dStr}`;
+      const score = y * 10000 + m * 100 + d;
+
+      return { year: y, month: m, day: d, formattedYMD, score };
     }
   }
-  const timestamp = new Date(dateStr).getTime();
-  return isNaN(timestamp) ? 0 : timestamp;
+
+  // Fallback pengurai Date UTC untuk mencegah pergeseran zona waktu lokal
+  const parsedDate = new Date(trimmed);
+  if (!isNaN(parsedDate.getTime())) {
+    const y = parsedDate.getUTCFullYear();
+    const m = parsedDate.getUTCMonth() + 1;
+    const day = parsedDate.getUTCDate();
+    const yStr = String(y).padStart(4, '0');
+    const mStr = String(m).padStart(2, '0');
+    const dStr = String(day).padStart(2, '0');
+    return {
+      year: y,
+      month: m,
+      day,
+      formattedYMD: `${yStr}-${mStr}-${dStr}`,
+      score: y * 10000 + m * 100 + day,
+    };
+  }
+
+  return { year: 1970, month: 1, day: 1, formattedYMD: '1970-01-01', score: 19700101 };
+}
+
+export function parseDateScore(dateStr: string): number {
+  return parseDateDetails(dateStr).score;
+}
+
+export function normalizeDateString(dateStr: string): string {
+  return parseDateDetails(dateStr).formattedYMD;
+}
+
+export function normalizeLogbookEntry(entry: LogbookEntry): LogbookEntry {
+  const normDate = normalizeDateString(entry.tanggal);
+  return {
+    ...entry,
+    tanggal: normDate || entry.tanggal,
+  };
 }
 
 export function parseTimeScore(timeStr?: string): number {
-  if (!timeStr || timeStr === '-') return 0;
-  const parts = timeStr.trim().split(':');
+  if (!timeStr || timeStr === '-' || timeStr === '—') return 0;
+  const cleaned = timeStr.trim().replace(/[^\d:]/g, '');
+  const parts = cleaned.split(':');
   if (parts.length >= 2) {
     const h = parseInt(parts[0], 10);
     const min = parseInt(parts[1], 10);
     if (!isNaN(h) && !isNaN(min)) {
       return h * 60 + min;
     }
+  } else if (parts.length === 1) {
+    const h = parseInt(parts[0], 10);
+    if (!isNaN(h)) return h * 60;
   }
   return 0;
 }
 
 /**
- * Urutkan catatan logbook secara kronologis dari tanggal awal sampai tanggal akhir (Ascending: 1 -> 31)
+ * Urutkan catatan logbook secara kronologis mutlak dari tanggal awal sampai tanggal akhir (Ascending: 1 -> 31)
  * Jika berada pada tanggal yang sama, urutkan berdasarkan waktuMulai (pagi ke sore)
  */
 export function sortLogbookEntriesByDateAscending(entries: LogbookEntry[]): LogbookEntry[] {
-  return [...entries].sort((a, b) => {
-    // 1. Urutkan tanggal awal sampai tanggal akhir (ascending 1 -> 31)
-    const scoreA = parseDateScore(a.tanggal);
-    const scoreB = parseDateScore(b.tanggal);
-    if (scoreA !== scoreB) return scoreA - scoreB;
+  return [...entries]
+    .map(normalizeLogbookEntry)
+    .sort((a, b) => {
+      // 1. Urutkan tanggal awal sampai tanggal akhir (ascending 1 -> 31)
+      const scoreA = parseDateScore(a.tanggal);
+      const scoreB = parseDateScore(b.tanggal);
+      if (scoreA !== scoreB) return scoreA - scoreB;
 
-    // 2. Jika tanggal sama, urutkan berdasarkan jam mulai (pagi ke sore)
-    const timeScoreA = parseTimeScore(a.waktuMulai);
-    const timeScoreB = parseTimeScore(b.waktuMulai);
-    if (timeScoreA !== timeScoreB) return timeScoreA - timeScoreB;
+      // 2. Jika tanggal sama, urutkan berdasarkan jam mulai (pagi ke sore)
+      const timeScoreA = parseTimeScore(a.waktuMulai);
+      const timeScoreB = parseTimeScore(b.waktuMulai);
+      if (timeScoreA !== timeScoreB) return timeScoreA - timeScoreB;
 
-    // 3. Fallback createdAt
-    return (a.createdAt || '').localeCompare(b.createdAt || '');
-  });
+      // 3. Fallback createdAt
+      return (a.createdAt || '').localeCompare(b.createdAt || '');
+    });
 }
 
 export const OFFICIAL_DATE_REFERENCE_PHOTOS: Record<string, { fotoSebelum: string; fotoSesudah: string; label: string; lokasi: string }> = {

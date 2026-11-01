@@ -42,6 +42,12 @@ import {
   Square,
   Filter
 } from 'lucide-react';
+import { 
+  parseDateDetails, 
+  parseDateScore, 
+  parseTimeScore, 
+  normalizeLogbookEntry 
+} from '../utils/storage';
 
 interface OfficialReportViewProps {
   entries: LogbookEntry[];
@@ -146,18 +152,8 @@ export function cleanColorString(val: any): string {
 
 function formatIndonesianDate(dateStr: string): string {
   if (!dateStr) return '';
-  try {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const year = parts[0];
-      const monthIdx = parseInt(parts[1], 10) - 1;
-      const day = parseInt(parts[2], 10);
-      return `${day} ${MONTH_NAMES[monthIdx] || ''} ${year}`;
-    }
-    return dateStr;
-  } catch {
-    return dateStr;
-  }
+  const pd = parseDateDetails(dateStr);
+  return `${pd.day} ${MONTH_NAMES[pd.month - 1] || ''} ${pd.year}`;
 }
 
 export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile, onUpdateEntry, onRecoverPhotos }) => {
@@ -181,17 +177,11 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     const monthCounts = new Map<string, { year: number; month: number; count: number }>();
     entries.forEach((e) => {
       if (e.tanggal) {
-        const parts = e.tanggal.split('-');
-        if (parts.length >= 2) {
-          const y = parseInt(parts[0], 10);
-          const m = parseInt(parts[1], 10);
-          if (!isNaN(y) && !isNaN(m)) {
-            const key = `${y}-${m}`;
-            const current = monthCounts.get(key) || { year: y, month: m, count: 0 };
-            current.count++;
-            monthCounts.set(key, current);
-          }
-        }
+        const pd = parseDateDetails(e.tanggal);
+        const key = `${pd.year}-${pd.month}`;
+        const current = monthCounts.get(key) || { year: pd.year, month: pd.month, count: 0 };
+        current.count++;
+        monthCounts.set(key, current);
       }
     });
 
@@ -271,17 +261,11 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       const monthCounts = new Map<string, { year: number; month: number; count: number }>();
       entries.forEach((e) => {
         if (e.tanggal) {
-          const parts = e.tanggal.split('-');
-          if (parts.length >= 2) {
-            const y = parseInt(parts[0], 10);
-            const m = parseInt(parts[1], 10);
-            if (!isNaN(y) && !isNaN(m)) {
-              const key = `${y}-${m}`;
-              const current = monthCounts.get(key) || { year: y, month: m, count: 0 };
-              current.count++;
-              monthCounts.set(key, current);
-            }
-          }
+          const pd = parseDateDetails(e.tanggal);
+          const key = `${pd.year}-${pd.month}`;
+          const current = monthCounts.get(key) || { year: pd.year, month: pd.month, count: 0 };
+          current.count++;
+          monthCounts.set(key, current);
         }
       });
 
@@ -295,8 +279,8 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       setReportConfig((prev) => {
         // If config month currently has 0 entries, switch to the month with the most entries
         const hasCurrentMonthEntries = entries.some((e) => {
-          const ed = new Date(e.tanggal);
-          return ed.getFullYear() === prev.tahun && ed.getMonth() + 1 === prev.bulan;
+          const pd = parseDateDetails(e.tanggal);
+          return pd.year === prev.tahun && pd.month === prev.bulan;
         });
 
         if (!hasCurrentMonthEntries && best.count > 0) {
@@ -315,14 +299,15 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   // Filter entries for this report period and strictly sort chronologically from earliest to latest date (1 -> 31)
   const filteredEntries = useMemo(() => {
     return entries
+      .map(normalizeLogbookEntry)
       .filter((e) => {
         if (reportConfig.tipe === 'semua') {
           return true; // Show all logbook entries
         }
 
-        const d = new Date(e.tanggal);
-        const entryYear = d.getFullYear();
-        const entryMonth = d.getMonth() + 1;
+        const pd = parseDateDetails(e.tanggal);
+        const entryYear = pd.year;
+        const entryMonth = pd.month;
 
         if (entryYear !== reportConfig.tahun) return false;
 
@@ -341,14 +326,14 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         return true; // Tahunan
       })
       .sort((a, b) => {
-        // 1. Urutkan tanggal dari awal sampai akhir (1 -> 31)
-        const dateDiff = a.tanggal.localeCompare(b.tanggal);
-        if (dateDiff !== 0) return dateDiff;
+        // 1. Urutkan tanggal dari awal sampai akhir secara numerik kronologis (1 -> 31)
+        const scoreA = parseDateScore(a.tanggal);
+        const scoreB = parseDateScore(b.tanggal);
+        if (scoreA !== scoreB) return scoreA - scoreB;
         // 2. Jika tanggal sama, urutkan jam mulai (pagi ke sore)
-        const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
-        const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
-        const timeDiff = timeA.localeCompare(timeB);
-        if (timeDiff !== 0) return timeDiff;
+        const timeScoreA = parseTimeScore(a.waktuMulai);
+        const timeScoreB = parseTimeScore(b.waktuMulai);
+        if (timeScoreA !== timeScoreB) return timeScoreA - timeScoreB;
         // 3. Fallback createdAt
         return (a.createdAt || '').localeCompare(b.createdAt || '');
       });
@@ -380,8 +365,8 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
     if (reportConfig.tipe === 'bulanan' || reportConfig.tipe === 'semua') {
       filteredEntries.forEach((e) => {
-        const d = new Date(e.tanggal);
-        const dateStr = `${d.getDate()} ${MONTH_NAMES[d.getMonth()]}`;
+        const pd = parseDateDetails(e.tanggal);
+        const dateStr = `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
         let itemDesc = '';
 
         if (e.kehadiran === 'Sakit') {
@@ -418,7 +403,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
       quarterMonths.forEach((m) => {
         const monthEntries = filteredEntries.filter(
-          (e) => new Date(e.tanggal).getMonth() + 1 === m
+          (e) => parseDateDetails(e.tanggal).month === m
         );
         const items: string[] = [];
 
@@ -449,7 +434,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       [1, 2, 3, 4].forEach((q) => {
         const qMonths = ({ 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] } as Record<number, number[]>)[q] || [];
         const qEntries = filteredEntries.filter((e) =>
-          qMonths.includes(new Date(e.tanggal).getMonth() + 1)
+          qMonths.includes(parseDateDetails(e.tanggal).month)
         );
         const items = qEntries.map((e) => {
           if (e.kehadiran === 'Sakit') return `Izin Sakit: ${e.keterangan || '-'}`;

@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { LogbookEntry, AttendanceStatus } from '../types/logbook';
-import { parseDateScore, parseTimeScore } from '../utils/storage';
+import { parseDateScore, parseTimeScore, parseDateDetails, normalizeLogbookEntry } from '../utils/storage';
 import { 
   Search, 
   Calendar, 
@@ -69,6 +69,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
   // Filtered and chronologically sorted entries
   const filteredEntries = useMemo(() => {
     return entries
+      .map(normalizeLogbookEntry)
       .filter((entry) => {
         // Search term
         if (searchTerm.trim()) {
@@ -86,7 +87,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
 
         // Month filter (YYYY-MM)
         if (filterMonth !== 'all') {
-          const entryMonth = entry.tanggal.substring(0, 7);
+          const entryMonth = parseDateDetails(entry.tanggal).formattedYMD.substring(0, 7);
           if (entryMonth !== filterMonth) return false;
         }
 
@@ -94,7 +95,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
       })
       .sort((a, b) => {
         const factor = sortOrder === 'asc' ? 1 : -1;
-        // 1. Urutkan tanggal secara numerik (1 s/d 31 setiap bulan)
+        // 1. Urutkan tanggal secara numerik mutlak (1 s/d 31 setiap bulan)
         const dateScoreA = parseDateScore(a.tanggal);
         const dateScoreB = parseDateScore(b.tanggal);
         if (dateScoreA !== dateScoreB) {
@@ -115,7 +116,8 @@ export const LogbookList: React.FC<LogbookListProps> = ({
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
     entries.forEach((e) => {
-      set.add(e.tanggal.substring(0, 7));
+      const ym = parseDateDetails(e.tanggal).formattedYMD.substring(0, 7);
+      set.add(ym);
     });
     return Array.from(set).sort().reverse();
   }, [entries]);
