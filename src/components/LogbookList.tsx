@@ -15,7 +15,10 @@ import {
   X,
   Maximize2,
   AlertCircle,
-  HardDrive
+  HardDrive,
+  RotateCcw,
+  CheckCircle2,
+  Camera
 } from 'lucide-react';
 
 interface LogbookListProps {
@@ -24,6 +27,7 @@ interface LogbookListProps {
   onDeleteEntry: (id: string) => void;
   onAddNew: () => void;
   onImportBackup: (imported: LogbookEntry[]) => void;
+  onRecoverPhotos?: () => { count: number; dates: string[] };
 }
 
 export const LogbookList: React.FC<LogbookListProps> = ({
@@ -32,6 +36,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
   onDeleteEntry,
   onAddNew,
   onImportBackup,
+  onRecoverPhotos,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -39,6 +44,27 @@ export const LogbookList: React.FC<LogbookListProps> = ({
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // Default: Tanggal awal sampai akhir (1 -> 31)
   const [previewPhotoEntry, setPreviewPhotoEntry] = useState<LogbookEntry | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<LogbookEntry | null>(null);
+  const [recoveryFeedback, setRecoveryFeedback] = useState<{
+    show: boolean;
+    count: number;
+    dates: string[];
+  } | null>(null);
+
+  // Missing photos detector (WFO entries without fotoSebelum or fotoSesudah)
+  const missingPhotosEntries = useMemo(() => {
+    return entries.filter((e) => e.kehadiran === 'WFO' && (!e.fotoSebelum || !e.fotoSesudah));
+  }, [entries]);
+
+  const handleTriggerRecovery = () => {
+    if (onRecoverPhotos) {
+      const res = onRecoverPhotos();
+      setRecoveryFeedback({
+        show: true,
+        count: res.count,
+        dates: res.dates,
+      });
+    }
+  };
 
   // Filtered and chronologically sorted entries
   const filteredEntries = useMemo(() => {
@@ -171,7 +197,27 @@ export const LogbookList: React.FC<LogbookListProps> = ({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          {onRecoverPhotos && (
+            <button
+              onClick={handleTriggerRecovery}
+              className={`flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg transition-all shadow-xs border ${
+                missingPhotosEntries.length > 0
+                  ? 'bg-amber-600 hover:bg-amber-700 text-white border-amber-400 shadow-md ring-2 ring-amber-400/50'
+                  : 'text-white bg-white/10 border-white/20 hover:bg-white/20'
+              }`}
+              title="Pulihkan seluruh foto dokumentasi kegiatan yang hilang secara ketat sesuai tanggal"
+            >
+              <RotateCcw className="w-3.5 h-3.5 text-amber-300" />
+              <span>Pulihkan Foto (Recovery)</span>
+              {missingPhotosEntries.length > 0 && (
+                <span className="ml-0.5 px-1.5 py-0.2 rounded-full bg-amber-950 text-amber-200 text-[10px] font-bold">
+                  {missingPhotosEntries.length}
+                </span>
+              )}
+            </button>
+          )}
+
           <button
             onClick={handleExportJson}
             className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-white/10 border border-white/20 rounded-lg hover:bg-white/20 transition-colors shadow-xs"
@@ -201,6 +247,64 @@ export const LogbookList: React.FC<LogbookListProps> = ({
           </button>
         </div>
       </div>
+
+      {/* Alert Banner: Pemberitahuan Foto Belum Lengkap / Terpotong */}
+      {missingPhotosEntries.length > 0 && (
+        <div className="bg-amber-950/80 border border-amber-500/40 rounded-xl p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-white shadow-md">
+          <div className="flex items-center gap-3">
+            <div className="p-2.5 rounded-lg bg-amber-500/20 text-amber-300 shrink-0">
+              <AlertCircle className="w-5 h-5 text-amber-400" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-amber-200 flex items-center gap-2">
+                <span>Pemberitahuan Foto Dokumentasi</span>
+                <span className="px-1.5 py-0.5 rounded bg-amber-500/30 text-amber-200 text-[10px] font-mono">
+                  {missingPhotosEntries.length} kegiatan belum lengkap
+                </span>
+              </p>
+              <p className="text-[11px] text-stone-300 mt-0.5 leading-relaxed">
+                Sebagian foto terpotong akibat kuota penyimpanan peramban. Klik tombol untuk mengembalikan foto dokumentasi (Foto Sebelum & Foto Sesudah) secara otomatis sesuai tanggal kegiatan.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={handleTriggerRecovery}
+            className="shrink-0 px-3.5 py-2 bg-amber-600 hover:bg-amber-500 text-white font-bold rounded-lg text-xs flex items-center gap-1.5 shadow-xs transition-colors"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Pulihkan Foto Sekarang</span>
+          </button>
+        </div>
+      )}
+
+      {/* Feedback Toast / Banner saat Pemulihan Foto Berhasil */}
+      {recoveryFeedback && recoveryFeedback.show && (
+        <div className="bg-emerald-900/90 border border-emerald-400 text-white rounded-xl p-4 shadow-xl flex items-start justify-between gap-3 animate-fadeIn">
+          <div className="flex items-start gap-3">
+            <CheckCircle2 className="w-5 h-5 text-emerald-300 shrink-0 mt-0.5" />
+            <div className="text-xs space-y-1">
+              <p className="font-bold text-sm text-emerald-100">
+                Pemulihan Foto Dokumentasi Sesuai Tanggal Berhasil!
+              </p>
+              <p className="text-emerald-200 leading-relaxed">
+                {recoveryFeedback.count > 0 
+                  ? `Berhasil memulihkan ${recoveryFeedback.count} foto dokumentasi (Foto Sebelum & Foto Sesudah) yang langsung dicocokkan secara akurat dengan tanggal kegiatan (${recoveryFeedback.dates.length} tanggal terpulihkan).`
+                  : 'Seluruh foto dokumentasi kegiatan telah lengkap dan sesuai dengan tanggal.'}
+              </p>
+              <p className="text-[11px] text-emerald-300">
+                Foto kini telah aktif kembali di menu rekap dan langsung tertera pada Tabel Dokumentasi Laporan Resmi.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setRecoveryFeedback(null)}
+            className="text-emerald-200 hover:text-white p-1 rounded-lg hover:bg-white/10"
+            title="Tutup pemberitahuan"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
 
       {/* Quick Attendance KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">

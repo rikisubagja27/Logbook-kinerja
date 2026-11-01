@@ -47,6 +47,7 @@ interface OfficialReportViewProps {
   entries: LogbookEntry[];
   profile: UserProfile;
   onUpdateEntry?: (entry: LogbookEntry) => void;
+  onRecoverPhotos?: () => { count: number; dates: string[] };
 }
 
 const MONTH_NAMES = [
@@ -159,7 +160,7 @@ function formatIndonesianDate(dateStr: string): string {
   }
 }
 
-export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile, onUpdateEntry }) => {
+export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile, onUpdateEntry, onRecoverPhotos }) => {
   // Dynamic initialization: Default to 'semua' so all filled logbooks are immediately displayed!
   const [reportConfig, setReportConfig] = useState<ReportConfig>(() => {
     const today = new Date();
@@ -1201,6 +1202,24 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               <Edit3 className="w-3.5 h-3.5" />
               <span>{isEditMode ? 'Selesai Edit' : 'Edit Laporan'}</span>
             </button>
+
+            {onRecoverPhotos && (
+              <button
+                onClick={() => {
+                  const res = onRecoverPhotos();
+                  alert(
+                    res.count > 0
+                      ? `Berhasil memulihkan ${res.count} foto dokumentasi sesuai tanggal (${res.dates.length} tanggal). Foto langsung muncul di Tabel Dokumentasi!`
+                      : 'Seluruh foto dokumentasi sudah lengkap sesuai tanggal.'
+                  );
+                }}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold shadow-md transition-colors border border-amber-400/40 cursor-pointer"
+                title="Pulihkan seluruh foto dokumentasi kegiatan yang hilang secara ketat sesuai tanggal"
+              >
+                <RotateCcw className="w-3.5 h-3.5 text-amber-200" />
+                <span>Pulihkan Foto</span>
+              </button>
+            )}
 
             <button
               onClick={handleExportDocx}

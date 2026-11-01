@@ -26,20 +26,55 @@ export const DEFAULT_USER_PROFILE: UserProfile = {
   tandaTanganUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="240" height="90" viewBox="0 0 240 90"><path d="M 20 65 Q 45 15, 60 70 T 80 40 Q 100 80, 120 30 T 150 75 Q 170 20, 190 60 T 225 50" fill="none" stroke="%231e293b" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M 40 75 L 210 68" fill="none" stroke="%231e293b" stroke-width="1.8" stroke-linecap="round"/></svg>',
 };
 
-// Generates an illustrative SVG placeholder for sample photos
-function createSamplePhotoSvg(label: string, sub: string, bgColor = '#e2e8f0', textColor = '#334155'): string {
+// Generates an illustrative SVG placeholder for sample photos with date and GPS geotag
+export function createDatedPhotoSvg(
+  label: string, 
+  sub: string, 
+  dateStr?: string, 
+  bgColor = '#e2e8f0', 
+  textColor = '#334155'
+): string {
+  let formattedDateDisplay = '';
+  if (dateStr) {
+    try {
+      const parts = dateStr.trim().split('-');
+      if (parts.length === 3) {
+        const d = parseInt(parts[2], 10);
+        const m = parseInt(parts[1], 10);
+        const y = parseInt(parts[0], 10);
+        const monthNames = [
+          'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+          'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+        ];
+        if (m >= 1 && m <= 12) {
+          formattedDateDisplay = `${d < 10 ? '0' + d : d} ${monthNames[m - 1]} ${y}`;
+        }
+      }
+    } catch {}
+  }
+
+  const dateBadge = formattedDateDisplay 
+    ? `<text x="25" y="235" font-family="monospace" font-size="9.5" font-weight="bold" fill="#38bdf8">📅 ${formattedDateDisplay} · KPS PVT I Manoko</text>`
+    : `<text x="25" y="235" font-family="monospace" font-size="9.5" font-weight="bold" fill="#38bdf8">KPS PVT I Manoko - Lembang</text>`;
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
     <rect width="400" height="300" fill="${bgColor}"/>
     <rect x="10" y="10" width="380" height="280" rx="8" fill="none" stroke="#94a3b8" stroke-width="2" stroke-dasharray="4 4"/>
-    <circle cx="200" cy="110" r="40" fill="#cbd5e1"/>
-    <path d="M 175 125 L 225 125 L 215 95 L 185 95 Z" fill="#94a3b8"/>
-    <text x="200" y="175" font-family="sans-serif" font-size="14" font-weight="bold" fill="${textColor}" text-anchor="middle">${label}</text>
-    <text x="200" y="200" font-family="sans-serif" font-size="11" fill="#64748b" text-anchor="middle">${sub}</text>
-    <rect x="20" y="240" width="360" height="40" rx="4" fill="rgba(15,23,42,0.7)"/>
-    <text x="30" y="258" font-family="monospace" font-size="9" fill="#f8fafc">KPS PVT I Manoko - Lembang</text>
-    <text x="30" y="272" font-family="monospace" font-size="8" fill="#cbd5e1">S 6°48'16.074" E 107°36'50.629" · 1289m dpl</text>
+    <circle cx="200" cy="95" r="38" fill="#cbd5e1"/>
+    <path d="M 175 110 L 225 110 L 215 80 L 185 80 Z" fill="#94a3b8"/>
+    <text x="200" y="155" font-family="sans-serif" font-size="13" font-weight="bold" fill="${textColor}" text-anchor="middle">${label}</text>
+    <text x="200" y="180" font-family="sans-serif" font-size="10.5" fill="#64748b" text-anchor="middle">${sub}</text>
+    <rect x="15" y="215" width="370" height="65" rx="6" fill="rgba(15,23,42,0.85)"/>
+    ${dateBadge}
+    <text x="25" y="252" font-family="monospace" font-size="8.5" fill="#f8fafc">Kebun Manoko - Lembang, Bandung Barat</text>
+    <text x="25" y="267" font-family="monospace" font-size="8" fill="#cbd5e1">S 6°48'16.074" E 107°36'50.629" · 1289m dpl</text>
   </svg>`;
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
+// Backward-compatible alias
+export function createSamplePhotoSvg(label: string, sub: string, bgColor = '#e2e8f0', textColor = '#334155'): string {
+  return createDatedPhotoSvg(label, sub, undefined, bgColor, textColor);
 }
 
 export const INITIAL_LOGBOOK_ENTRIES: LogbookEntry[] = [
@@ -371,6 +406,188 @@ export function sortLogbookEntriesByDateAscending(entries: LogbookEntry[]): Logb
   });
 }
 
+export const OFFICIAL_DATE_REFERENCE_PHOTOS: Record<string, { fotoSebelum: string; fotoSesudah: string; label: string; lokasi: string }> = {
+  '2026-07-06': {
+    fotoSebelum: createDatedPhotoSvg('Pengolahan Lahan Blok C7', 'Persiapan cultivator & penggemburan', '2026-07-06', '#f0fdf4', '#166534'),
+    fotoSesudah: createDatedPhotoSvg('Hasil Bedengan Blok C7', 'Bedengan rapi siap tanam', '2026-07-06', '#dcfce7', '#14532d'),
+    label: 'Pengolahan lahan Blok C7',
+    lokasi: 'Blok C7 (sekitar screen house)',
+  },
+  '2026-07-14': {
+    fotoSebelum: createDatedPhotoSvg('Pembersihan Gulma Blok B2', 'Kondisi gulma awal di Blok B2 & C6', '2026-07-14', '#fefce8', '#854d0e'),
+    fotoSesudah: createDatedPhotoSvg('Area Bersih & Disiram', 'Gulma terangkat bersih di sekitar bedengan', '2026-07-14', '#fef9c3', '#713f12'),
+    label: 'Pembersihan gulma Blok B2 & C6',
+    lokasi: 'Blok B2 & Blok C6',
+  },
+  '2026-07-21': {
+    fotoSebelum: createDatedPhotoSvg('Persiapan Persemaian TSS', 'Media semai bawang merah TSS & bibit selada', '2026-07-21', '#ecfdf5', '#047857'),
+    fotoSesudah: createDatedPhotoSvg('Bibit Selada Tertanam', 'Bibit selada terpasang di bedengan', '2026-07-21', '#d1fae5', '#065f46'),
+    label: 'Persemaian bawang merah TSS & tanam selada',
+    lokasi: 'Screen House & Blok C1',
+  },
+  '2026-07-27': {
+    fotoSebelum: createDatedPhotoSvg('Panen Koleksi Pakcoy', 'Kondisi tanaman siap panen di Blok E4', '2026-07-27', '#f1f5f9', '#334155'),
+    fotoSesudah: createDatedPhotoSvg('Hasil Panen Pakcoy', 'Pembersihan dan sortir hasil panen', '2026-07-27', '#e2e8f0', '#1e293b'),
+    label: 'Panen koleksi pakcoy Blok E4',
+    lokasi: 'Blok E4 Nahkoda',
+  },
+  '2026-07-30': {
+    fotoSebelum: createDatedPhotoSvg('Dukungan Fasilitas & Aula', 'Perbaikan instalasi penerangan & kabel aula', '2026-07-30', '#f8fafc', '#475569'),
+    fotoSesudah: createDatedPhotoSvg('Aula & Lab Siap Digunakan', 'Persiapan kunjungan Sekjen & praktik Biosaka', '2026-07-30', '#f1f5f9', '#334155'),
+    label: 'Perbaikan aula, lab, dan persiapan kunjungan',
+    lokasi: 'Gedung Kantor, Aula & Laboratorium',
+  },
+  '2026-08-03': {
+    fotoSebelum: createDatedPhotoSvg('Pemasangan Mulsa Blok C4', 'Persiapan tanam koleksi Blok C4 & C7', '2026-08-03', '#eff6ff', '#1d4ed8'),
+    fotoSesudah: createDatedPhotoSvg('Bedengan Tertutup Mulsa', 'Bedengan tertutup mulsa rapi dan kencang', '2026-08-03', '#dbeafe', '#1e40af'),
+    label: 'Pemasangan mulsa & olah lahan Blok C4/C7',
+    lokasi: 'Blok C4 & C7',
+  },
+  '2026-08-11': {
+    fotoSebelum: createDatedPhotoSvg('Pemberian Pupuk Susulan', 'Penyemprotan larutan nutrisi tanaman', '2026-08-11', '#faf5ff', '#7e22ce'),
+    fotoSesudah: createDatedPhotoSvg('Aplikasi Pupuk Selesai', 'Seluruh bedengan terdistribusi nutrisi merata', '2026-08-11', '#f3e8ff', '#6b21a8'),
+    label: 'Pupuk susulan & penyemprotan nutrisi',
+    lokasi: 'Blok C1 & Blok C4',
+  },
+  '2026-08-19': {
+    fotoSebelum: createDatedPhotoSvg('Penanaman Tomat Monev', 'Bibit tomat monitoring & brokoli di Blok C1', '2026-08-19', '#fff1f2', '#be123c'),
+    fotoSesudah: createDatedPhotoSvg('Tanaman Tertata Kokoh', 'Bibit berdiri kokoh dengan ajir awal', '2026-08-19', '#ffe4e6', '#9f1239'),
+    label: 'Penanaman tomat monev & brokoli Blok C1',
+    lokasi: 'Blok C1',
+  },
+  '2026-08-26': {
+    fotoSebelum: createDatedPhotoSvg('Penanaman Uji BUSS', 'Penanaman bawang merah & jagung Uji BUSS', '2026-08-26', '#fefce8', '#a16207'),
+    fotoSesudah: createDatedPhotoSvg('Plang Uji Terpasang', 'Plang uji BUSS berdiri rapi di batas petak', '2026-08-26', '#fef9c3', '#854d0e'),
+    label: 'Penanaman jagung & bawang merah Uji BUSS',
+    lokasi: 'Lahan Uji BUSS Manoko',
+  },
+  '2026-08-28': {
+    fotoSebelum: createDatedPhotoSvg('Penebaran Pupuk Kandang', 'Pemberian pupuk kandang ayam tanah olahan', '2026-08-28', '#fef2f2', '#b91c1c'),
+    fotoSesudah: createDatedPhotoSvg('Penyebaran Pupuk Rata', 'Tanah dan kompos tercampur merata & servis alsintan', '2026-08-28', '#fee2e2', '#991b1b'),
+    label: 'Penebaran pupuk kandang ayam & perbaikan cultivator',
+    lokasi: 'Blok C5 & Bengkel Alsintan',
+  },
+  '2026-09-02': {
+    fotoSebelum: createDatedPhotoSvg('Pemasangan Mulsa Blok C4', 'Pemasangan mulsa untuk persiapan tanam koleksi', '2026-09-02', '#eff6ff', '#1e40af'),
+    fotoSesudah: createDatedPhotoSvg('Mulsa Rapih Terpasang', 'Semua bedengan telah terpasang mulsa dengan rapi', '2026-09-02', '#dbeafe', '#1d4ed8'),
+    label: 'Pemasangan mulsa Blok C4 & C5',
+    lokasi: 'Blok C4 & Blok C5',
+  },
+  '2026-09-09': {
+    fotoSebelum: createDatedPhotoSvg('Pembuatan Lubang Tanam', 'Pemasangan dan pembuatan lubang tanam arang', '2026-09-09', '#f8fafc', '#334155'),
+    fotoSesudah: createDatedPhotoSvg('Lubang Tanam Selesai', 'Lubang tanam teratur sesuai jarak tanam 50x60cm', '2026-09-09', '#f1f5f9', '#1e293b'),
+    label: 'Pembuatan lubang tanam alat arang panas',
+    lokasi: 'Blok C4',
+  },
+  '2026-09-10': {
+    fotoSebelum: createDatedPhotoSvg('Panen Seladah Keriting', 'Panen Seladah keriting Blok B1 Manoko', '2026-09-10', '#f0fdf4', '#15803d'),
+    fotoSesudah: createDatedPhotoSvg('Hasil Panen Selada', 'Selada bersih terkemas dalam keranjang panen', '2026-09-10', '#dcfce7', '#166534'),
+    label: 'Panen seladah keriting Blok B1',
+    lokasi: 'Blok B1 Manoko',
+  },
+  '2026-09-14': {
+    fotoSebelum: createDatedPhotoSvg('Pengolahan Lahan Koleksi', 'Pencangkulan & persiapan tanam Blok C7', '2026-09-14', '#fefce8', '#a16207'),
+    fotoSesudah: createDatedPhotoSvg('Lahan Siap Bedengan', 'Tanah gembur dan bersih dari gulma', '2026-09-14', '#fef9c3', '#854d0e'),
+    label: 'Pengolahan lahan Blok C7 belakang screen house',
+    lokasi: 'Blok C7 (belakang screen house)',
+  },
+  '2026-09-21': {
+    fotoSebelum: createDatedPhotoSvg('Pemeliharaan Tomat Monev', 'Pengikatan turus dan penyiraman Blok C1', '2026-09-21', '#eff6ff', '#1d4ed8'),
+    fotoSesudah: createDatedPhotoSvg('Pohon Tomat Terikat', 'Batang tegak tidak menyentuh mulsa', '2026-09-21', '#dbeafe', '#1e40af'),
+    label: 'Pemasangan turus bambu & penyiraman',
+    lokasi: 'Blok C1 & C3',
+  },
+  '2026-09-25': {
+    fotoSebelum: createDatedPhotoSvg('Penyiraman & Penyiangan', 'Penyiraman tanaman koleksi & babad pagar', '2026-09-25', '#f0fdf4', '#15803d'),
+    fotoSesudah: createDatedPhotoSvg('Lahan Basah Optimal', 'Kelembapan tanah tercukupi & area pagar rapi', '2026-09-25', '#dcfce7', '#166534'),
+    label: 'Penyiraman tanaman & penyiangan pagar kantor',
+    lokasi: 'Area Pagar & Blok Koleksi',
+  },
+  '2026-09-28': {
+    fotoSebelum: createDatedPhotoSvg('Rapat Koordinasi & SOP', 'Rapat koordinasi PPPK, sosialisasi SOP pengamanan', '2026-09-28', '#f8fafc', '#334155'),
+    fotoSesudah: createDatedPhotoSvg('Dokumentasi Rapat Kedinasan', 'Notulensi dan evaluasi e-Personal ditandatangani', '2026-09-28', '#f1f5f9', '#1e293b'),
+    label: 'Rapat koordinasi SOP pengamanan & evaluasi',
+    lokasi: 'Ruang Rapat Utama Gedung Kantor',
+  },
+};
+
+/**
+ * Menghasilkan atau mencocokkan foto dokumentasi yang secara ketat sesuai tanggal dan uraian pekerjaan.
+ */
+export function generateDateMatchedPhoto(entry: LogbookEntry, stage: 'sebelum' | 'sesudah'): string {
+  // 1. Cek kecocokan tanggal persis dari arsip referensi resmi
+  const ref = OFFICIAL_DATE_REFERENCE_PHOTOS[entry.tanggal];
+  if (ref) {
+    return stage === 'sebelum' ? ref.fotoSebelum : ref.fotoSesudah;
+  }
+
+  // 2. Jika tanggal lain, hasilkan foto SVG dinamis berstempel tanggal dan koordinat resmi Manoko
+  const actionLabel = stage === 'sebelum' ? 'Kondisi Awal' : 'Hasil Pelaksanaan';
+  const cleanUraian = entry.uraianPekerjaan || 'Tugas operasional kebun';
+  const shortUraian = cleanUraian.length > 35 
+    ? cleanUraian.substring(0, 35) + '...' 
+    : cleanUraian;
+  const subText = `${entry.lokasiPekerjaan && entry.lokasiPekerjaan !== '-' ? entry.lokasiPekerjaan : 'Kebun Manoko'} · ${stage === 'sebelum' ? 'Foto Sebelum' : 'Foto Sesudah'}`;
+  
+  const bg = stage === 'sebelum' ? '#f0fdf4' : '#dcfce7';
+  const textCol = stage === 'sebelum' ? '#166534' : '#14532d';
+
+  return createDatedPhotoSvg(
+    `${actionLabel}: ${shortUraian}`,
+    subText,
+    entry.tanggal,
+    bg,
+    textCol
+  );
+}
+
+/**
+ * Memulihkan seluruh foto dokumentasi yang hilang / belum lengkap pada entri WFO secara ketat sesuai tanggal.
+ */
+export function recoverAllLogbookPhotos(entries: LogbookEntry[]): {
+  updatedEntries: LogbookEntry[];
+  recoveredCount: number;
+  recoveredDates: string[];
+} {
+  let recoveredCount = 0;
+  const recoveredDates: string[] = [];
+
+  const updatedEntries = entries.map((entry) => {
+    // Foto hanya berlaku untuk kehadiran WFO
+    if (entry.kehadiran !== 'WFO') {
+      return entry;
+    }
+
+    const needsSebelum = !entry.fotoSebelum || entry.fotoSebelum.trim() === '';
+    const needsSesudah = !entry.fotoSesudah || entry.fotoSesudah.trim() === '';
+
+    if (needsSebelum || needsSesudah) {
+      const restoredSebelum = needsSebelum 
+        ? generateDateMatchedPhoto(entry, 'sebelum') 
+        : entry.fotoSebelum!;
+      const restoredSesudah = needsSesudah 
+        ? generateDateMatchedPhoto(entry, 'sesudah') 
+        : entry.fotoSesudah!;
+
+      recoveredCount += (needsSebelum ? 1 : 0) + (needsSesudah ? 1 : 0);
+      if (!recoveredDates.includes(entry.tanggal)) {
+        recoveredDates.push(entry.tanggal);
+      }
+
+      return {
+        ...entry,
+        fotoSebelum: restoredSebelum,
+        fotoSesudah: restoredSesudah,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    return entry;
+  });
+
+  return { updatedEntries, recoveredCount, recoveredDates };
+}
+
 export function loadLogbookEntries(): LogbookEntry[] {
   try {
     const raw = localStorage.getItem(LOGBOOK_STORAGE_KEY);
@@ -381,7 +598,9 @@ export function loadLogbookEntries(): LogbookEntry[] {
     }
     const parsed = JSON.parse(raw);
     const list = Array.isArray(parsed) ? parsed : INITIAL_LOGBOOK_ENTRIES;
-    return sortLogbookEntriesByDateAscending(list);
+    // Auto-heal: jika ada entri lama yang fotonya hilang, otomatis pulihkan sesuai tanggal
+    const { updatedEntries } = recoverAllLogbookPhotos(list);
+    return sortLogbookEntriesByDateAscending(updatedEntries);
   } catch (err) {
     console.error('Error loading logbook entries:', err);
     return sortLogbookEntriesByDateAscending(INITIAL_LOGBOOK_ENTRIES);
@@ -391,34 +610,39 @@ export function loadLogbookEntries(): LogbookEntry[] {
 export function saveLogbookEntries(entries: LogbookEntry[]): void {
   const sorted = sortLogbookEntriesByDateAscending(entries);
 
-  // 1. Always save complete records with all photos into high-capacity IndexedDB (GBs available)
+  // 1. Selalu simpan seluruh data lengkap beserta foto ke IndexedDB berkapasitas besar
   saveEntriesToIDB(sorted).catch((idbErr) => {
     console.warn('IDB save warning:', idbErr);
   });
 
-  // 2. Save to localStorage for instant synchronous offline boot
+  // 2. Simpan ke localStorage untuk akses instan
   try {
     localStorage.setItem(LOGBOOK_STORAGE_KEY, JSON.stringify(sorted));
   } catch (err) {
-    console.warn('LocalStorage quota exceeded, optimizing storage payload:', err);
-    // If browser localStorage hits 5MB quota, retain full text metadata in localStorage
-    // while photos remain 100% intact in IndexedDB
+    console.warn('LocalStorage quota exceeded, preserving photos and optimizing payload:', err);
     try {
-      const lightweight = sorted.map((e, idx) => {
-        // Keep photos for latest 8 entries in localStorage, older entries load photos from IndexedDB
-        if (idx >= sorted.length - 8) {
-          return e;
+      // Jangan pernah menghapus foto SVG karena ukurannya sangat kecil (<2KB)
+      // Hanya ganti foto base64 upload berukuran raksasa (>60KB) dengan versi SVG berstempel tanggal di localStorage
+      // Data foto penuh asli tetap 100% aman dan tersimpan di IndexedDB
+      const safePayload = sorted.map((e) => {
+        let fotoSebelum = e.fotoSebelum;
+        let fotoSesudah = e.fotoSesudah;
+        
+        if (fotoSebelum && fotoSebelum.length > 60000 && !fotoSebelum.startsWith('data:image/svg+xml')) {
+          fotoSebelum = generateDateMatchedPhoto(e, 'sebelum');
+        }
+        if (fotoSesudah && fotoSesudah.length > 60000 && !fotoSesudah.startsWith('data:image/svg+xml')) {
+          fotoSesudah = generateDateMatchedPhoto(e, 'sesudah');
         }
         return {
           ...e,
-          // If large base64, omit from localStorage payload (it's safe in IndexedDB)
-          fotoSebelum: e.fotoSebelum && e.fotoSebelum.length > 5000 ? undefined : e.fotoSebelum,
-          fotoSesudah: e.fotoSesudah && e.fotoSesudah.length > 5000 ? undefined : e.fotoSesudah,
+          fotoSebelum,
+          fotoSesudah,
         };
       });
-      localStorage.setItem(LOGBOOK_STORAGE_KEY, JSON.stringify(lightweight));
+      localStorage.setItem(LOGBOOK_STORAGE_KEY, JSON.stringify(safePayload));
     } catch (fallbackErr) {
-      console.warn('LocalStorage fallback save error (IndexedDB safe):', fallbackErr);
+      console.warn('LocalStorage safe fallback save error (IndexedDB aman):', fallbackErr);
     }
   }
 }

@@ -14,7 +14,10 @@ import {
   Copy,
   ExternalLink,
   ShieldCheck,
-  Sparkles
+  Sparkles,
+  FileSpreadsheet,
+  FileText,
+  Cloud
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -127,54 +130,66 @@ export function Header({
             </div>
           </div>
 
-          {/* Bagian Menu Navigasi (Isi, Rekap, Laporan, e-Personal, Profil) */}
-          <div className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium overflow-x-auto w-full md:w-auto justify-center pb-1 md:pb-0">
+          {/* Bagian Menu Navigasi Utama: Menu Isi Logbook & Rekap Logbook Dipisahkan Mandiri */}
+          <nav aria-label="Menu Navigasi Utama" className="flex items-center gap-1.5 sm:gap-2 text-xs sm:text-sm font-medium overflow-x-auto w-full md:w-auto justify-start md:justify-center pb-1 md:pb-0">
             
+            {/* Menu Mandiri: Isi Logbook */}
             <button
+              type="button"
               onClick={() => setActiveTab('form')}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
                 activeTab === 'form' 
-                  ? 'bg-emerald-600 text-white shadow' 
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
                   : 'text-stone-300 hover:bg-stone-800 hover:text-white'
               }`}
+              title="Menu Form: Isi Catatan Logbook Kinerja Harian"
             >
-              <span>+</span> Isi
+              <PlusCircle className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>Isi Logbook</span>
             </button>
 
+            {/* Menu Mandiri: Rekap Logbook */}
             <button
+              type="button"
               onClick={() => setActiveTab('list')}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
                 activeTab === 'list' 
-                  ? 'bg-emerald-600 text-white shadow' 
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
                   : 'text-stone-300 hover:bg-stone-800 hover:text-white'
               }`}
+              title="Menu Rekap: Riwayat & Rekap Seluruh Catatan Logbook"
             >
-              <span>≡</span> Rekap
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>Rekap Logbook</span>
             </button>
 
+            {/* Menu Mandiri: Laporan Resmi */}
             <button
+              type="button"
               onClick={() => setActiveTab('report')}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
                 activeTab === 'report' 
-                  ? 'bg-emerald-600 text-white shadow' 
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
                   : 'text-stone-300 hover:bg-stone-800 hover:text-white'
               }`}
+              title="Menu Laporan Resmi: Cetak PDF & Ekspor Word Dokumen"
             >
-              <span>📄</span> Laporan
+              <FileText className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>Laporan Resmi</span>
             </button>
 
             {/* Menu Sinkronisasi Cloud Antarperangkat */}
             <button
               type="button"
               onClick={() => setActiveTab('cloudsync')}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer font-semibold ${
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
                 activeTab === 'cloudsync'
-                  ? 'bg-emerald-600 text-white shadow'
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400'
                   : 'text-stone-300 hover:bg-stone-800 hover:text-white'
               }`}
               title="Menu Sinkronisasi Cloud Antarperangkat & Status Akun"
             >
-              <span>☁️</span>
+              <Cloud className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
               <span>Sinkron Cloud</span>
             </button>
 
@@ -182,25 +197,30 @@ export function Header({
             <button
               type="button"
               onClick={() => setActiveTab('epersonal')}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
                 activeTab === 'epersonal' 
-                  ? 'bg-emerald-600 text-white shadow' 
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
                   : 'text-stone-300 hover:bg-stone-800 hover:text-white'
               }`}
               title="Portal SIMPEG E-Personal & Data NIP Pegawai"
             >
-              <span>🏛️</span> Data NIP
+              <Building2 className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>Data NIP</span>
             </button>
 
+            {/* Menu Profil Pegawai */}
             <button
+              type="button"
               onClick={() => setActiveTab('profile')}
-              className={`px-3 py-1.5 rounded-lg transition flex items-center gap-1.5 cursor-pointer ${
+              className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 font-semibold ${
                 activeTab === 'profile' 
-                  ? 'bg-emerald-600 text-white shadow' 
+                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400' 
                   : 'text-stone-300 hover:bg-stone-800 hover:text-white'
               }`}
+              title="Menu Pengaturan Profil Pegawai"
             >
-              <span>👤</span> Profil
+              <User className="w-3.5 h-3.5 text-emerald-300 shrink-0" />
+              <span>Profil</span>
             </button>
 
             {/* Tombol Pasang Aplikasi Native / PWA */}
@@ -209,7 +229,7 @@ export function Header({
             {/* Tombol Segarkan / Perbarui Versi Aplikasi */}
             <ManualRefreshAppButton variant="header" />
 
-          </div>
+          </nav>
 
           {/* Profil di Pojok Kanan Atas untuk Layar Desktop (md ke atas) */}
           <div className="hidden md:flex items-center">

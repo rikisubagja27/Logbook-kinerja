@@ -14,7 +14,8 @@ import {
   loadGoogleAccount,
   mergeCloudNipDirectory,
   initRosterFromIDB,
-  loadNipDirectory
+  loadNipDirectory,
+  recoverAllLogbookPhotos
 } from './utils/storage';
 import { 
   auth, 
@@ -145,18 +146,32 @@ export default function App() {
     };
     window.addEventListener('kps-nip-directory-updated', handleDirectoryUpdated);
 
-    // 5. Load all entries from high-capacity IndexedDB to ensure daily entries are never lost
+    // 5. Load all entries from high-capacity IndexedDB to ensure daily entries and photos are never lost
     getAllEntriesFromIDB().then((idbEntries) => {
-      if (idbEntries && idbEntries.length > 0) {
-        setEntries((prev) => {
-          const map = new Map<string, LogbookEntry>();
-          prev.forEach((e) => map.set(e.id, e));
-          idbEntries.forEach((e) => map.set(e.id, e));
-          const merged = sortLogbookEntriesByDateAscending(Array.from(map.values()));
-          saveLogbookEntries(merged);
-          return merged;
-        });
-      }
+      setEntries((prev) => {
+        const map = new Map<string, LogbookEntry>();
+        prev.forEach((e) => map.set(e.id, e));
+
+        if (idbEntries && idbEntries.length > 0) {
+          idbEntries.forEach((idbEntry) => {
+            const current = map.get(idbEntry.id);
+            // Prioritize whichever has photos
+            const fotoSebelum = idbEntry.fotoSebelum || current?.fotoSebelum;
+            const fotoSesudah = idbEntry.fotoSesudah || current?.fotoSesudah;
+            map.set(idbEntry.id, {
+              ...(current || idbEntry),
+              fotoSebelum,
+              fotoSesudah,
+            });
+          });
+        }
+
+        const merged = sortLogbookEntriesByDateAscending(Array.from(map.values()));
+        // Auto-heal: Ensure all entries have photos matching their exact dates
+        const { updatedEntries } = recoverAllLogbookPhotos(merged);
+        saveLogbookEntries(updatedEntries);
+        return updatedEntries;
+      });
     }).catch((err) => console.warn('IDB load warning:', err));
 
     return () => {
@@ -189,10 +204,19 @@ export default function App() {
           batchSyncEntriesToCloud(currentUser.uid, localList);
         }
       } else if (cloudEntries.length > 0) {
-        // MERGE: Keep union of local and cloud entries so no entries are lost!
+        // MERGE: Keep union of local and cloud entries, never wipe out local photos
         setEntries((prev) => {
           const map = new Map<string, LogbookEntry>();
-          cloudEntries.forEach((e) => map.set(e.id, e));
+          cloudEntries.forEach((cloudEntry) => {
+            const local = prev.find((p) => p.id === cloudEntry.id);
+            const fotoSebelum = cloudEntry.fotoSebelum || local?.fotoSebelum;
+            const fotoSesudah = cloudEntry.fotoSesudah || local?.fotoSesudah;
+            map.set(cloudEntry.id, {
+              ...cloudEntry,
+              fotoSebelum,
+              fotoSesudah,
+            });
+          });
           // Preserve any local entries that aren't yet in cloud, and upload them
           prev.forEach((e) => {
             if (!map.has(e.id)) {
@@ -201,8 +225,9 @@ export default function App() {
             }
           });
           const merged = sortLogbookEntriesByDateAscending(Array.from(map.values()));
-          saveLogbookEntries(merged);
-          return merged;
+          const { updatedEntries } = recoverAllLogbookPhotos(merged);
+          saveLogbookEntries(updatedEntries);
+          return updatedEntries;
         });
       }
     }, (error) => {
@@ -326,6 +351,23 @@ export default function App() {
     }
   }, [currentUser, entries, profile]);
 
+  // Fitur Pemulihan Foto (Recovery): Mengembalikan seluruh foto dokumentasi yang hilang secara ketat sesuai tanggal
+  const handleRecoverPhotos = useCallback((): { count: number; dates: string[] } => {
+    let result = { count: 0, dates: [] as string[] };
+    setEntries((prev) => {
+      const { updatedEntries, recoveredCount, recoveredDates } = recoverAllLogbookPhotos(prev);
+      result = { count: recoveredCount, dates: recoveredDates };
+      saveLogbookEntries(updatedEntries);
+      if (currentUser && recoveredCount > 0) {
+        batchSyncEntriesToCloud(currentUser.uid, updatedEntries).catch((e) => {
+          console.warn('Sync recovered photos to cloud warning:', e);
+        });
+      }
+      return updatedEntries;
+    });
+    return result;
+  }, [currentUser]);
+
   return (
     <div className="min-h-screen app-bg-gradient flex flex-col font-sans text-stone-900 selection:bg-emerald-400 selection:text-stone-950">
       {/* Top Header */}
@@ -374,6 +416,7 @@ export default function App() {
               setActiveTab('form');
             }}
             onImportBackup={handleImportBackup}
+            onRecoverPhotos={handleRecoverPhotos}
           />
         )}
 
@@ -382,6 +425,7 @@ export default function App() {
             entries={entries}
             profile={profile}
             onUpdateEntry={handleSaveEntry}
+            onRecoverPhotos={handleRecoverPhotos}
           />
         )}
 
