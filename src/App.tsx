@@ -11,6 +11,7 @@ import {
   sortLogbookEntriesByDateAscending,
   saveGoogleAccount,
   clearGoogleAccount,
+  loadGoogleAccount,
   mergeCloudNipDirectory,
   initRosterFromIDB,
   loadNipDirectory
@@ -25,14 +26,16 @@ import {
   subscribeToCloudEmployees,
   fetchCloudEmployees,
   syncAllEmployeesToCloud,
-  handleGoogleRedirectResult
+  handleGoogleRedirectResult,
+  ActiveSyncUser,
+  getDeterministicUserId
 } from './firebase';
 import { 
   getAllEntriesFromIDB, 
   saveSingleEntryToIDB, 
   deleteEntryFromIDB 
 } from './utils/idbStorage';
-import { onAuthStateChanged, User as FirebaseUser } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 import { collection, doc, onSnapshot } from 'firebase/firestore';
 import { Header } from './components/Header';
 import { LogbookForm } from './components/LogbookForm';
@@ -53,8 +56,14 @@ export default function App() {
   const [isRefreshingOfficers, setIsRefreshingOfficers] = useState(false);
   const [editingEntry, setEditingEntry] = useState<LogbookEntry | null>(null);
 
-  // Firebase Real-time Cloud Synchronization State
-  const [currentUser, setCurrentUser] = useState<FirebaseUser | null>(null);
+  // Firebase Real-time Cloud Synchronization State - persistent across reloads
+  const [currentUser, setCurrentUser] = useState<ActiveSyncUser | null>(() => {
+    const cached = loadGoogleAccount();
+    if (cached && cached.email) {
+      return cached;
+    }
+    return null;
+  });
   const [isSyncing, setIsSyncing] = useState(false);
   const isInitialSyncRef = useRef(false);
 
@@ -84,21 +93,22 @@ export default function App() {
       if (user) {
         setCurrentUser(user);
       }
-    });
+    }).catch(() => {});
 
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      setCurrentUser(user);
       if (user) {
-        saveGoogleAccount({
-          uid: user.uid,
-          displayName: user.displayName || user.email?.split('@')[0] || 'Pegawai',
-          email: user.email || '',
+        const email = user.email || '';
+        const uid = getDeterministicUserId(email, user.uid);
+        const userObj: ActiveSyncUser = {
+          uid,
+          email,
+          displayName: user.displayName || email.split('@')[0] || 'Pegawai',
           photoURL: user.photoURL || undefined,
           provider: 'google.com',
           lastLogin: new Date().toISOString(),
-        });
-      } else {
-        clearGoogleAccount();
+        };
+        saveGoogleAccount(userObj);
+        setCurrentUser(userObj);
       }
     });
 
@@ -380,6 +390,10 @@ export default function App() {
             currentUser={currentUser}
             isSyncing={isSyncing}
             entriesCount={entries.length}
+            profileEmail={profile.email}
+            profileName={profile.nama}
+            onAccountConnected={(acc) => setCurrentUser(acc)}
+            onLogout={() => setCurrentUser(null)}
             onManualSync={currentUser ? handleManualSync : undefined}
             onNavigateToProfile={() => setActiveTab('profile')}
             onNavigateToEpersonal={() => setActiveTab('epersonal')}

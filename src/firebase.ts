@@ -28,7 +28,18 @@ import {
   setPersistence
 } from 'firebase/auth';
 import firebaseConfig from '../firebase-applet-config.json';
-import { LogbookEntry, UserProfile } from './types/logbook';
+import { LogbookEntry, UserProfile, GoogleAccount } from './types/logbook';
+import { clearGoogleAccount, saveGoogleAccount, loadGoogleAccount } from './utils/storage';
+
+export type ActiveSyncUser = GoogleAccount;
+
+export function getDeterministicUserId(email: string, rawUid?: string): string {
+  const clean = (email || '').trim().toLowerCase();
+  if (clean) {
+    return 'g_' + clean.replace(/[^a-z0-9]/g, '_');
+  }
+  return rawUid || 'user_anonymous';
+}
 
 // Initialize Firebase App
 export const app = initializeApp(firebaseConfig);
@@ -68,52 +79,98 @@ googleProvider.setCustomParameters({
 // Test Connection on initial boot as required by Firestore integration guidelines
 export async function testConnection() {
   try {
-    // If there is a cached user session with an invalid or expired token, validate it first
     if (auth.currentUser) {
       try {
         await auth.currentUser.getIdToken(false);
       } catch (tokenErr: any) {
-        console.warn('Stale auth session detected, resetting to allow clean sign-in.');
-        await fbSignOut(auth);
+        console.warn('Auth token refresh notice:', tokenErr);
       }
     }
     await getDocFromServer(doc(db, 'test', 'connection'));
   } catch (error: any) {
-    const msg = error?.message || '';
-    if (msg.includes('token-service-api') || msg.includes('securetoken.googleapis.com')) {
-      try {
-        await fbSignOut(auth);
-      } catch {}
-    }
+    // Graceful offline fallback - never force logout the user on startup
+    console.warn('Connection check notice (operating in local cache mode):', error?.message || error);
   }
 }
 
 // Check connection gracefully without blocking app startup
 setTimeout(() => {
   testConnection().catch(() => {});
-}, 1500);
+}, 3000);
 
 // ==========================================
 // Firestore Cloud Sync Services
 // ==========================================
 
-export async function loginWithGoogle(): Promise<FirebaseUser | null> {
+export async function loginWithGoogle(): Promise<ActiveSyncUser | null> {
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    return result.user;
-  } catch (error: any) {
-    console.warn('Popup sign in failed, trying redirect:', error);
-    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
-      await signInWithRedirect(auth, googleProvider);
-    } else {
-      throw error;
+    if (result && result.user) {
+      const email = result.user.email || '';
+      const uid = getDeterministicUserId(email, result.user.uid);
+      const userObj: ActiveSyncUser = {
+        uid,
+        email,
+        displayName: result.user.displayName || email.split('@')[0] || 'Pegawai',
+        photoURL: result.user.photoURL || undefined,
+        provider: 'google.com',
+        lastLogin: new Date().toISOString(),
+      };
+      saveGoogleAccount(userObj);
+      return userObj;
     }
-    return null;
+  } catch (error: any) {
+    console.warn('Popup sign in notice, checking redirect:', error);
+    if (error.code === 'auth/popup-blocked' || error.code === 'auth/cancelled-popup-request') {
+      try {
+        await signInWithRedirect(auth, googleProvider);
+        return null;
+      } catch (redirectErr) {
+        console.warn('Redirect sign-in notice:', redirectErr);
+      }
+    }
+    throw error;
   }
+  return null;
+}
+
+export async function connectGoogleAccountDirectly(email: string, displayName?: string): Promise<ActiveSyncUser> {
+  const cleanEmail = (email || '').trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    throw new Error('Alamat email Google tidak valid.');
+  }
+
+  // Attempt anonymous auth in background so Firebase Auth has an active session
+  try {
+    if (!auth.currentUser) {
+      const { signInAnonymously } = await import('firebase/auth');
+      await signInAnonymously(auth);
+    }
+  } catch (anonErr) {
+    console.warn('Anonymous auth notice (proceeding in direct partition mode):', anonErr);
+  }
+
+  const uid = getDeterministicUserId(cleanEmail);
+  const account: ActiveSyncUser = {
+    uid,
+    email: cleanEmail,
+    displayName: displayName || cleanEmail.split('@')[0].toUpperCase(),
+    photoURL: undefined,
+    provider: 'google.com',
+    lastLogin: new Date().toISOString(),
+  };
+
+  saveGoogleAccount(account);
+  return account;
 }
 
 export async function logoutUser(): Promise<void> {
-  await fbSignOut(auth);
+  clearGoogleAccount();
+  try {
+    await fbSignOut(auth);
+  } catch (err) {
+    console.warn('fbSignOut notice:', err);
+  }
 }
 
 // Save or Update a single Logbook Entry in Firestore
@@ -189,11 +246,22 @@ export async function fetchCloudEntries(userId: string): Promise<LogbookEntry[]>
 }
 
 // Check redirect login result for mobile / standalone PWA browsers
-export async function handleGoogleRedirectResult(): Promise<FirebaseUser | null> {
+export async function handleGoogleRedirectResult(): Promise<ActiveSyncUser | null> {
   try {
     const result = await getRedirectResult(auth);
     if (result && result.user) {
-      return result.user;
+      const email = result.user.email || '';
+      const uid = getDeterministicUserId(email, result.user.uid);
+      const userObj: ActiveSyncUser = {
+        uid,
+        email,
+        displayName: result.user.displayName || email.split('@')[0] || 'Pegawai',
+        photoURL: result.user.photoURL || undefined,
+        provider: 'google.com',
+        lastLogin: new Date().toISOString(),
+      };
+      saveGoogleAccount(userObj);
+      return userObj;
     }
   } catch (err) {
     console.warn('Redirect auth check warning:', err);

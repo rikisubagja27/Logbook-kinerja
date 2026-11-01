@@ -160,25 +160,52 @@ function formatIndonesianDate(dateStr: string): string {
 }
 
 export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile, onUpdateEntry }) => {
-  // Dynamic initialization based on latest entry or current date
+  // Dynamic initialization: Default to 'semua' so all filled logbooks are immediately displayed!
   const [reportConfig, setReportConfig] = useState<ReportConfig>(() => {
-    let targetDate = new Date();
-    if (entries && entries.length > 0) {
-      const sorted = [...entries].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
-      if (sorted[0]?.tanggal) {
-        const parsed = new Date(sorted[0].tanggal);
-        if (!isNaN(parsed.getTime())) targetDate = parsed;
-      }
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const todayStr = today.toISOString().split('T')[0];
+
+    if (!entries || entries.length === 0) {
+      return {
+        tipe: 'semua',
+        tahun: currentYear,
+        bulan: today.getMonth() + 1,
+        triwulan: Math.ceil((today.getMonth() + 1) / 3),
+        tanggalCetak: todayStr,
+      };
     }
-    const year = targetDate.getFullYear();
-    const month = targetDate.getMonth() + 1;
-    const quarter = Math.ceil(month / 3);
-    const todayStr = new Date().toISOString().split('T')[0];
+
+    // Find the primary month that has the most entries filled
+    const monthCounts = new Map<string, { year: number; month: number; count: number }>();
+    entries.forEach((e) => {
+      if (e.tanggal) {
+        const parts = e.tanggal.split('-');
+        if (parts.length >= 2) {
+          const y = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10);
+          if (!isNaN(y) && !isNaN(m)) {
+            const key = `${y}-${m}`;
+            const current = monthCounts.get(key) || { year: y, month: m, count: 0 };
+            current.count++;
+            monthCounts.set(key, current);
+          }
+        }
+      }
+    });
+
+    let best = { year: currentYear, month: today.getMonth() + 1, count: 0 };
+    monthCounts.forEach((val) => {
+      if (val.count > best.count) {
+        best = val;
+      }
+    });
+
     return {
-      tipe: 'bulanan',
-      tahun: year,
-      bulan: month,
-      triwulan: quarter,
+      tipe: 'semua', // Langsung tampilkan seluruh logbook yang sudah diisi tanpa perlu klik 'semua'!
+      tahun: best.year,
+      bulan: best.month,
+      triwulan: Math.ceil(best.month / 3),
       tanggalCetak: todayStr,
     };
   });
@@ -240,32 +267,47 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   // Auto-synchronize report period when new entries are added so they immediately show up!
   useEffect(() => {
     if (entries && entries.length > 0) {
-      const sorted = [...entries].sort((a, b) => new Date(b.tanggal).getTime() - new Date(a.tanggal).getTime());
-      const latest = sorted[0];
-      if (latest?.tanggal) {
-        const d = new Date(latest.tanggal);
-        const latestYear = d.getFullYear();
-        const latestMonth = d.getMonth() + 1;
-
-        setReportConfig((prev) => {
-          // Check if current month in config has any entries
-          const hasCurrentMonthEntries = entries.some((e) => {
-            const ed = new Date(e.tanggal);
-            return ed.getFullYear() === prev.tahun && ed.getMonth() + 1 === prev.bulan;
-          });
-
-          // If current month has zero entries but latest month has entries, automatically switch
-          if (!hasCurrentMonthEntries) {
-            return {
-              ...prev,
-              tahun: latestYear,
-              bulan: latestMonth,
-              triwulan: Math.ceil(latestMonth / 3),
-            };
+      const monthCounts = new Map<string, { year: number; month: number; count: number }>();
+      entries.forEach((e) => {
+        if (e.tanggal) {
+          const parts = e.tanggal.split('-');
+          if (parts.length >= 2) {
+            const y = parseInt(parts[0], 10);
+            const m = parseInt(parts[1], 10);
+            if (!isNaN(y) && !isNaN(m)) {
+              const key = `${y}-${m}`;
+              const current = monthCounts.get(key) || { year: y, month: m, count: 0 };
+              current.count++;
+              monthCounts.set(key, current);
+            }
           }
-          return prev;
+        }
+      });
+
+      let best = { year: new Date().getFullYear(), month: new Date().getMonth() + 1, count: 0 };
+      monthCounts.forEach((val) => {
+        if (val.count > best.count) {
+          best = val;
+        }
+      });
+
+      setReportConfig((prev) => {
+        // If config month currently has 0 entries, switch to the month with the most entries
+        const hasCurrentMonthEntries = entries.some((e) => {
+          const ed = new Date(e.tanggal);
+          return ed.getFullYear() === prev.tahun && ed.getMonth() + 1 === prev.bulan;
         });
-      }
+
+        if (!hasCurrentMonthEntries && best.count > 0) {
+          return {
+            ...prev,
+            tahun: best.year,
+            bulan: best.month,
+            triwulan: Math.ceil(best.month / 3),
+          };
+        }
+        return prev;
+      });
     }
   }, [entries]);
 
@@ -311,8 +353,8 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       });
   }, [entries, reportConfig]);
 
-  const periodTitle = getReportPeriodTitle(reportConfig);
-  const periodText = getReportPeriodText(reportConfig);
+  const periodTitle = getReportPeriodTitle(reportConfig, filteredEntries);
+  const periodText = getReportPeriodText(reportConfig, filteredEntries);
 
   // Compute default text values
   const defaultLatarBelakang = useMemo(() => {
@@ -587,26 +629,36 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     setHasCustomEdits(false);
   };
 
-  // Dynamic pagination for Table 1:
-  // Page 0 has BAB II heading, 2.1 description, and table description (max 7 rows)
-  // Subsequent continuation pages have only continuation table header (max 9 rows)
-  // Ensures that up to 16+ rows fit into exactly 2 A4 sheets with zero clipping or cut-offs
+  // Dynamic optimized pagination for Table 1:
+  // Maximizes space on each A4 page so table rows fill the page neatly without massive empty gaps
   const table1Pages = useMemo(() => {
     if (customTable1.length === 0) return [[]];
-    if (customTable1.length <= 7) return [customTable1];
+    // If 10 rows or fewer, fits cleanly on a single page
+    if (customTable1.length <= 10) return [customTable1];
+
+    // If between 11 and 20 rows, balance across 2 pages (e.g. 8 & 8, or 9 & 7, or 10 & 10)
+    if (customTable1.length <= 20) {
+      const page1Count = Math.ceil(customTable1.length / 2);
+      return [
+        customTable1.slice(0, page1Count),
+        customTable1.slice(page1Count)
+      ];
+    }
+
+    // For larger sets (>20 rows): Page 0 holds 10 rows, continuation pages hold up to 12 rows each
     const pages: Table1RowItem[][] = [];
-    pages.push(customTable1.slice(0, 7));
-    for (let i = 7; i < customTable1.length; i += 9) {
-      pages.push(customTable1.slice(i, i + 9));
+    pages.push(customTable1.slice(0, 10));
+    for (let i = 10; i < customTable1.length; i += 12) {
+      pages.push(customTable1.slice(i, i + 12));
     }
     return pages;
   }, [customTable1]);
 
-  // Paginate Table 2 photos: exactly 2 photos per A4 sheet for maximum clarity & no cut-offs
+  // Paginate Table 2 photos: exactly 4 photos per A4 sheet to maximize space and avoid excessive pages
   const photoPages = useMemo(() => {
     if (customPhotos.length === 0) return [];
     const pages: ReportPhotoItem[][] = [];
-    const chunkSize = 2;
+    const chunkSize = 4;
     for (let i = 0; i < customPhotos.length; i += chunkSize) {
       pages.push(customPhotos.slice(i, i + chunkSize));
     }
@@ -1534,7 +1586,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
         {/* ==================== PAGE 3+: BAB II AKUNTABILITAS KINERJA (TABEL 1) ==================== */}
         {table1Pages.map((pageRows, pageIdx) => {
-          const globalStartIndex = pageIdx === 0 ? 0 : 7 + (pageIdx - 1) * 9;
+          const globalStartIndex = table1Pages.slice(0, pageIdx).reduce((acc, curr) => acc + curr.length, 0);
 
           return (
             <div key={`table1-page-${pageIdx}`} className="relative">
@@ -1793,15 +1845,15 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                       )}
                     </div>
 
-                    {/* Table 2 layout with 2 photos per sheet */}
+                    {/* Table 2 layout with 4 photos per sheet */}
                     <div style={{ border: '1px solid #000000', width: '100%', boxSizing: 'border-box' }}>
                       <table className="w-full text-left text-[11pt] border-collapse font-sans" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', border: '1px solid #000000' }}>
                         <thead>
                           <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #000000' }} className="font-bold text-[11pt]">
-                            <th style={{ border: '1px solid #000000', padding: '10px', textAlign: 'center', width: '48%', boxSizing: 'border-box' }}>
+                            <th style={{ border: '1px solid #000000', padding: '8px 10px', textAlign: 'center', width: '45%', boxSizing: 'border-box' }}>
                               Foto Dokumentasi
                             </th>
-                            <th style={{ border: '1px solid #000000', padding: '10px', textAlign: 'center', width: '52%', boxSizing: 'border-box' }}>
+                            <th style={{ border: '1px solid #000000', padding: '8px 10px', textAlign: 'center', width: '55%', boxSizing: 'border-box' }}>
                               Keterangan
                             </th>
                           </tr>
@@ -1812,8 +1864,8 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                             return (
                               <tr key={doc.id || actualIdx} style={{ borderBottom: '1px solid #000000' }} className="align-middle">
                                 {/* Foto Cell with Clean Container */}
-                                <td style={{ border: '1px solid #000000', padding: '12px 8px', textAlign: 'center', verticalAlign: 'middle', width: '48%', backgroundColor: '#ffffff', boxSizing: 'border-box' }}>
-                                  <div style={{ width: '260px', height: '170px', maxWidth: '100%', margin: '0 auto', border: '1px solid #555555', backgroundColor: '#f8fafc', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', position: 'relative' }} className="group">
+                                <td style={{ border: '1px solid #000000', padding: '6px', textAlign: 'center', verticalAlign: 'middle', width: '45%', backgroundColor: '#ffffff', boxSizing: 'border-box' }}>
+                                  <div style={{ width: '205px', height: '135px', maxWidth: '100%', margin: '0 auto', border: '1px solid #555555', backgroundColor: '#f8fafc', overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', boxSizing: 'border-box', position: 'relative' }} className="group">
                                     <img
                                       src={doc.foto}
                                       alt={`Dokumentasi ${actualIdx + 1}`}
@@ -1867,7 +1919,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                 </td>
 
                                 {/* Keterangan Cell */}
-                                <td style={{ border: '1px solid #000000', padding: '14px', verticalAlign: 'top', width: '52%', backgroundColor: '#ffffff', boxSizing: 'border-box' }} className="leading-relaxed">
+                                <td style={{ border: '1px solid #000000', padding: '8px 12px', verticalAlign: 'top', width: '55%', backgroundColor: '#ffffff', boxSizing: 'border-box' }} className="leading-relaxed">
                                   {isEditMode ? (
                                     <div className="space-y-2">
                                       <label className="block text-[11px] font-semibold text-stone-600 font-sans">
@@ -2460,7 +2512,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
               {/* Modal Footer */}
               <div className="flex items-center justify-between pt-3 border-t border-stone-200">
                 <span className="text-[11px] text-stone-500">
-                  Tabel 2 akan otomatis menyesuaikan (2 foto per halaman A4).
+                  Tabel 2 akan otomatis menyesuaikan (4 foto per halaman A4 untuk mengoptimalkan ruang).
                 </span>
                 <button
                   type="button"

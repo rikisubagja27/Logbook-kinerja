@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { User as FirebaseUser } from 'firebase/auth';
-import { loginWithGoogle, logoutUser } from '../firebase';
+import { loginWithGoogle, logoutUser, ActiveSyncUser } from '../firebase';
 import { 
   Cloud, 
   CloudCheck, 
@@ -16,7 +16,7 @@ import {
 } from 'lucide-react';
 
 interface CloudSyncBannerProps {
-  currentUser: FirebaseUser | null;
+  currentUser: ActiveSyncUser | FirebaseUser | null;
   isSyncing: boolean;
   entriesCount: number;
   onManualSync?: () => void;

@@ -322,21 +322,49 @@ export const INITIAL_LOGBOOK_ENTRIES: LogbookEntry[] = [
   },
 ];
 
+export function parseDateScore(dateStr: string): number {
+  if (!dateStr) return 0;
+  const parts = dateStr.trim().split('-');
+  if (parts.length === 3) {
+    const y = parseInt(parts[0], 10);
+    const m = parseInt(parts[1], 10);
+    const d = parseInt(parts[2], 10);
+    if (!isNaN(y) && !isNaN(m) && !isNaN(d)) {
+      return y * 10000 + m * 100 + d;
+    }
+  }
+  const timestamp = new Date(dateStr).getTime();
+  return isNaN(timestamp) ? 0 : timestamp;
+}
+
+export function parseTimeScore(timeStr?: string): number {
+  if (!timeStr || timeStr === '-') return 0;
+  const parts = timeStr.trim().split(':');
+  if (parts.length >= 2) {
+    const h = parseInt(parts[0], 10);
+    const min = parseInt(parts[1], 10);
+    if (!isNaN(h) && !isNaN(min)) {
+      return h * 60 + min;
+    }
+  }
+  return 0;
+}
+
 /**
  * Urutkan catatan logbook secara kronologis dari tanggal awal sampai tanggal akhir (Ascending: 1 -> 31)
  * Jika berada pada tanggal yang sama, urutkan berdasarkan waktuMulai (pagi ke sore)
  */
 export function sortLogbookEntriesByDateAscending(entries: LogbookEntry[]): LogbookEntry[] {
   return [...entries].sort((a, b) => {
-    // 1. Urutkan tanggal awal sampai tanggal akhir (ascending)
-    const dateDiff = a.tanggal.localeCompare(b.tanggal);
-    if (dateDiff !== 0) return dateDiff;
+    // 1. Urutkan tanggal awal sampai tanggal akhir (ascending 1 -> 31)
+    const scoreA = parseDateScore(a.tanggal);
+    const scoreB = parseDateScore(b.tanggal);
+    if (scoreA !== scoreB) return scoreA - scoreB;
 
     // 2. Jika tanggal sama, urutkan berdasarkan jam mulai (pagi ke sore)
-    const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
-    const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
-    const timeDiff = timeA.localeCompare(timeB);
-    if (timeDiff !== 0) return timeDiff;
+    const timeScoreA = parseTimeScore(a.waktuMulai);
+    const timeScoreB = parseTimeScore(b.waktuMulai);
+    if (timeScoreA !== timeScoreB) return timeScoreA - timeScoreB;
 
     // 3. Fallback createdAt
     return (a.createdAt || '').localeCompare(b.createdAt || '');

@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { LogbookEntry, AttendanceStatus } from '../types/logbook';
+import { parseDateScore, parseTimeScore } from '../utils/storage';
 import { 
   Search, 
   Calendar, 
@@ -67,14 +68,18 @@ export const LogbookList: React.FC<LogbookListProps> = ({
       })
       .sort((a, b) => {
         const factor = sortOrder === 'asc' ? 1 : -1;
-        // 1. Urutkan tanggal
-        const dateDiff = a.tanggal.localeCompare(b.tanggal);
-        if (dateDiff !== 0) return factor * dateDiff;
+        // 1. Urutkan tanggal secara numerik (1 s/d 31 setiap bulan)
+        const dateScoreA = parseDateScore(a.tanggal);
+        const dateScoreB = parseDateScore(b.tanggal);
+        if (dateScoreA !== dateScoreB) {
+          return factor * (dateScoreA - dateScoreB);
+        }
         // 2. Jika tanggal sama, urutkan jam mulai (pagi ke sore)
-        const timeA = a.waktuMulai && a.waktuMulai !== '-' ? a.waktuMulai : '';
-        const timeB = b.waktuMulai && b.waktuMulai !== '-' ? b.waktuMulai : '';
-        const timeDiff = timeA.localeCompare(timeB);
-        if (timeDiff !== 0) return factor * timeDiff;
+        const timeScoreA = parseTimeScore(a.waktuMulai);
+        const timeScoreB = parseTimeScore(b.waktuMulai);
+        if (timeScoreA !== timeScoreB) {
+          return factor * (timeScoreA - timeScoreB);
+        }
         // 3. Fallback createdAt
         return factor * (a.createdAt || '').localeCompare(b.createdAt || '');
       });
@@ -349,7 +354,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
         </div>
       ) : (
         <div className="space-y-3">
-          {filteredEntries.map((entry) => {
+          {filteredEntries.map((entry, index) => {
             const dateObj = new Date(entry.tanggal);
             const formattedDate = dateObj.toLocaleDateString('id-ID', {
               weekday: 'long',
@@ -367,6 +372,9 @@ export const LogbookList: React.FC<LogbookListProps> = ({
                 <div className="space-y-2 flex-1">
                   {/* Meta line */}
                   <div className="flex flex-wrap items-center gap-2 text-xs text-stone-500">
+                    <span className="px-1.5 py-0.5 rounded bg-stone-100 text-stone-700 font-mono font-bold text-[11px] border border-stone-200" title={`Urutan #${index + 1}`}>
+                      #{index + 1}
+                    </span>
                     <span className="font-bold text-stone-900">{formattedDate}</span>
                     {entry.kehadiran === 'WFO' && entry.waktuMulai && entry.waktuMulai !== '-' && (
                       <>

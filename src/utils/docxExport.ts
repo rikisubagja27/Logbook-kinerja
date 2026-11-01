@@ -24,9 +24,24 @@ const MONTH_NAMES = [
 
 const ROMAN_QUARTERS = ['I', 'II', 'III', 'IV'];
 
-export function getReportPeriodTitle(config: ReportConfig): string {
+export function getReportPeriodTitle(config: ReportConfig, entries?: LogbookEntry[]): string {
   if (config.tipe === 'semua') {
-    return `SELURUH CATATAN LOGBOOK KINERJA TAHUN ${config.tahun}`;
+    if (entries && entries.length > 0) {
+      const months = Array.from(new Set(entries.map((e) => {
+        const parts = (e.tanggal || '').split('-');
+        return parts.length >= 2 ? parseInt(parts[1], 10) : 0;
+      }).filter((m) => m > 0)));
+      if (months.length === 1) {
+        return `BULAN ${MONTH_NAMES[months[0] - 1]?.toUpperCase()} TAHUN ${config.tahun}`;
+      }
+      if (months.length > 1) {
+        months.sort((a, b) => a - b);
+        const startM = MONTH_NAMES[months[0] - 1]?.toUpperCase();
+        const endM = MONTH_NAMES[months[months.length - 1] - 1]?.toUpperCase();
+        return `PERIODE ${startM} - ${endM} TAHUN ${config.tahun}`;
+      }
+    }
+    return `BULAN ${MONTH_NAMES[config.bulan - 1]?.toUpperCase()} TAHUN ${config.tahun}`;
   }
   if (config.tipe === 'bulanan') {
     return `BULAN ${MONTH_NAMES[config.bulan - 1]?.toUpperCase()} TAHUN ${config.tahun}`;
@@ -37,9 +52,24 @@ export function getReportPeriodTitle(config: ReportConfig): string {
   return `TAHUN ${config.tahun}`;
 }
 
-export function getReportPeriodText(config: ReportConfig): string {
+export function getReportPeriodText(config: ReportConfig, entries?: LogbookEntry[]): string {
   if (config.tipe === 'semua') {
-    return `seluruh catatan logbook kinerja Tahun ${config.tahun}`;
+    if (entries && entries.length > 0) {
+      const months = Array.from(new Set(entries.map((e) => {
+        const parts = (e.tanggal || '').split('-');
+        return parts.length >= 2 ? parseInt(parts[1], 10) : 0;
+      }).filter((m) => m > 0)));
+      if (months.length === 1) {
+        return `Bulan ${MONTH_NAMES[months[0] - 1]} Tahun ${config.tahun}`;
+      }
+      if (months.length > 1) {
+        months.sort((a, b) => a - b);
+        const startM = MONTH_NAMES[months[0] - 1];
+        const endM = MONTH_NAMES[months[months.length - 1] - 1];
+        return `periode ${startM} - ${endM} Tahun ${config.tahun}`;
+      }
+    }
+    return `Bulan ${MONTH_NAMES[config.bulan - 1]} Tahun ${config.tahun}`;
   }
   if (config.tipe === 'bulanan') {
     return `Bulan ${MONTH_NAMES[config.bulan - 1]} Tahun ${config.tahun}`;
@@ -265,8 +295,8 @@ export async function exportReportToDocx(
   entries: LogbookEntry[],
   customData?: CustomReportData
 ) {
-  const periodTitle = getReportPeriodTitle(config);
-  const periodText = getReportPeriodText(config);
+  const periodTitle = getReportPeriodTitle(config, entries);
+  const periodText = getReportPeriodText(config, entries);
 
   // Filter entries according to config and sort chronologically from earliest to latest date (1 -> 31)
   const filtered = entries
@@ -406,7 +436,7 @@ export async function exportReportToDocx(
   if (customData?.documentationPhotos && customData.documentationPhotos.length > 0) {
     for (const doc of customData.documentationPhotos) {
       if (doc.foto) {
-        const imgData = await loadValidDocxImage(doc.foto, 'jpg', { width: 220, height: 165 });
+        const imgData = await loadValidDocxImage(doc.foto, 'jpg', { width: 190, height: 125 });
         if (imgData) {
           documentationRows.push({
             imageData: imgData,
@@ -418,7 +448,7 @@ export async function exportReportToDocx(
   } else {
     for (const entry of filtered) {
       if (entry.kehadiran === 'WFO' && entry.fotoSebelum) {
-        const imgData = await loadValidDocxImage(entry.fotoSebelum, 'jpg', { width: 220, height: 165 });
+        const imgData = await loadValidDocxImage(entry.fotoSebelum, 'jpg', { width: 190, height: 125 });
         if (imgData) {
           documentationRows.push({
             imageData: imgData,
@@ -573,7 +603,7 @@ export async function exportReportToDocx(
                       },
                     }),
                   ],
-                  spacing: { before: 120, after: 120 },
+                  spacing: { before: 80, after: 80 },
                 }),
               ],
             }),
@@ -585,7 +615,7 @@ export async function exportReportToDocx(
                     new TextRun({ text: '• ', bold: true }),
                     new TextRun({ text: cleanDocxText(doc.keterangan) }),
                   ],
-                  spacing: { before: 120, after: 120 },
+                  spacing: { before: 80, after: 80 },
                 }),
               ],
             }),
