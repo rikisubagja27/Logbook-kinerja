@@ -326,6 +326,17 @@ export default function App() {
     }
   };
 
+  // Langsung susun tanggal secara berurutan dan sinkronkan ke Laporan Resmi & Cloud
+  const handleSortAndSyncEntries = (sorted: LogbookEntry[]) => {
+    const fullySorted = sortLogbookEntriesByDateAscending(sorted);
+    setEntries(fullySorted);
+    saveLogbookEntries(fullySorted);
+
+    if (currentUser) {
+      batchSyncEntriesToCloud(currentUser.uid, fullySorted);
+    }
+  };
+
   const handleSaveProfile = (updatedProfile: UserProfile) => {
     setProfile(updatedProfile);
     saveUserProfile(updatedProfile);
@@ -417,6 +428,7 @@ export default function App() {
             }}
             onImportBackup={handleImportBackup}
             onRecoverPhotos={handleRecoverPhotos}
+            onSortEntries={handleSortAndSyncEntries}
           />
         )}
 

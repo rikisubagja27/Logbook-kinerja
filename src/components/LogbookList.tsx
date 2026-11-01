@@ -18,7 +18,8 @@ import {
   HardDrive,
   RotateCcw,
   CheckCircle2,
-  Camera
+  Camera,
+  ArrowUpDown
 } from 'lucide-react';
 
 interface LogbookListProps {
@@ -28,6 +29,7 @@ interface LogbookListProps {
   onAddNew: () => void;
   onImportBackup: (imported: LogbookEntry[]) => void;
   onRecoverPhotos?: () => { count: number; dates: string[] };
+  onSortEntries?: (sorted: LogbookEntry[]) => void;
 }
 
 export const LogbookList: React.FC<LogbookListProps> = ({
@@ -37,6 +39,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
   onAddNew,
   onImportBackup,
   onRecoverPhotos,
+  onSortEntries,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState<string>('all');
@@ -49,6 +52,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
     count: number;
     dates: string[];
   } | null>(null);
+  const [sortFeedback, setSortFeedback] = useState<string | null>(null);
 
   // Missing photos detector (WFO entries without fotoSebelum or fotoSesudah)
   const missingPhotosEntries = useMemo(() => {
@@ -64,6 +68,32 @@ export const LogbookList: React.FC<LogbookListProps> = ({
         dates: res.dates,
       });
     }
+  };
+
+  // Eksekusi penyusunan tanggal secara berurutan dan langsung sinkronkan ke master data / Laporan Resmi
+  const handleExecuteDateSort = (newOrder: 'asc' | 'desc' = 'asc') => {
+    setSortOrder(newOrder);
+    const sorted = [...entries].map(normalizeLogbookEntry).sort((a, b) => {
+      const factor = newOrder === 'asc' ? 1 : -1;
+      const scoreA = parseDateScore(a.tanggal);
+      const scoreB = parseDateScore(b.tanggal);
+      if (scoreA !== scoreB) return factor * (scoreA - scoreB);
+      const timeA = parseTimeScore(a.waktuMulai);
+      const timeB = parseTimeScore(b.waktuMulai);
+      if (timeA !== timeB) return factor * (timeA - timeB);
+      return factor * (a.createdAt || '').localeCompare(b.createdAt || '');
+    });
+
+    if (onSortEntries) {
+      onSortEntries(sorted);
+    } else if (onImportBackup) {
+      onImportBackup(sorted);
+    }
+
+    setSortFeedback(
+      `Semua tanggal logbook (${sorted.length} kegiatan) telah disusun rapi berurutan (${newOrder === 'asc' ? '1 s/d 31' : '31 s/d 1'}) dan langsung terinput ke Laporan Resmi!`
+    );
+    setTimeout(() => setSortFeedback(null), 4500);
   };
 
   // Filtered and chronologically sorted entries
@@ -308,6 +338,25 @@ export const LogbookList: React.FC<LogbookListProps> = ({
         </div>
       )}
 
+      {/* Feedback Banner saat Tanggal Berhasil Diurutkan & Terinput ke Laporan Resmi */}
+      {sortFeedback && (
+        <div className="bg-emerald-950/90 border border-emerald-400/80 text-white rounded-xl p-3.5 shadow-xl flex items-center justify-between gap-3 animate-fadeIn">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+            <p className="text-xs font-semibold text-emerald-100">
+              {sortFeedback}
+            </p>
+          </div>
+          <button
+            onClick={() => setSortFeedback(null)}
+            className="text-emerald-300 hover:text-white p-1 rounded-lg hover:bg-white/10 shrink-0"
+            title="Tutup"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Quick Attendance KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-xs flex flex-col">
@@ -398,15 +447,26 @@ export const LogbookList: React.FC<LogbookListProps> = ({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* Tombol Sentuh Cepat: Urutkan Tanggal Otomatis & Terinput ke Laporan Resmi */}
+          <button
+            type="button"
+            onClick={() => handleExecuteDateSort('asc')}
+            className="flex items-center gap-1.5 px-3 py-2 text-xs sm:text-sm font-bold rounded-lg bg-emerald-700 hover:bg-emerald-600 active:scale-95 text-white border border-emerald-400/50 shadow-xs cursor-pointer transition-all"
+            title="Ketuk untuk menyusun seluruh tanggal secara berurutan rapi (1→31) dan langsung menginputkannya ke Laporan Resmi"
+          >
+            <ArrowUpDown className="w-3.5 h-3.5 text-amber-300" />
+            <span>Urutkan Tanggal (1→31)</span>
+          </button>
+
           {/* Urutan Tanggal Selector */}
           <select
             value={sortOrder}
-            onChange={(e) => setSortOrder(e.target.value as 'asc' | 'desc')}
-            className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-stone-800"
+            onChange={(e) => handleExecuteDateSort(e.target.value as 'asc' | 'desc')}
+            className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium text-stone-800 cursor-pointer"
             title="Urutan Kronologis Tanggal Logbook"
           >
-            <option value="asc">📅 Tanggal: Awal ke Akhir (1→31)</option>
-            <option value="desc">📅 Tanggal: Akhir ke Awal (31→1)</option>
+            <option value="asc">📅 Urutan: Tanggal Awal ke Akhir (1→31)</option>
+            <option value="desc">📅 Urutan: Tanggal Akhir ke Awal (31→1)</option>
           </select>
 
           {/* Month filter */}

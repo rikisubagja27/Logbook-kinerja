@@ -352,43 +352,14 @@ export async function exportReportToDocx(
 
   if (customData?.table1Groups && customData.table1Groups.length > 0) {
     table1Groups = customData.table1Groups;
-  } else if (config.tipe === 'triwulan') {
-    const quarterMonths = {
-      1: [1, 2, 3],
-      2: [4, 5, 6],
-      3: [7, 8, 9],
-      4: [10, 11, 12],
-    }[config.triwulan] || [];
-
-    quarterMonths.forEach((m) => {
-      const monthEntries = filtered.filter((e) => parseDateDetails(e.tanggal).month === m);
-      const items: string[] = [];
-
-      monthEntries.forEach((e) => {
-        if (e.kehadiran === 'Sakit') {
-          items.push(`Izin Sakit: ${cleanDocxText(e.keterangan || 'Istirahat Sakit')}`);
-        } else if (e.kehadiran === 'Cuti') {
-          items.push(`Cuti: ${cleanDocxText(e.keterangan || 'Cuti Resmi')}`);
-        } else {
-          const locInfo = e.lokasiPekerjaan && e.lokasiPekerjaan !== '-' ? ` (${cleanDocxText(e.lokasiPekerjaan)})` : '';
-          items.push(`${cleanDocxText(e.uraianPekerjaan)}${locInfo}`);
-        }
-      });
-
-      if (items.length === 0) {
-        items.push('Pelaksanaan tugas operasional kebun dan pemeliharaan rutin');
-      }
-
-      table1Groups.push({
-        label: MONTH_NAMES[m - 1],
-        items,
-        keterangan: '-',
-      });
-    });
-  } else if (config.tipe === 'bulanan' || config.tipe === 'semua') {
+  } else {
     filtered.forEach((e) => {
       const pd = parseDateDetails(e.tanggal);
-      const dateStr = `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
+      const dateStr =
+        config.tipe === 'tahunan'
+          ? `${pd.day} ${MONTH_NAMES[pd.month - 1]} ${pd.year}`
+          : `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
+
       let itemDesc = '';
       if (e.kehadiran === 'Sakit') {
         itemDesc = `Izin Sakit: ${cleanDocxText(e.keterangan || 'Istirahat Sakit')}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
@@ -410,25 +381,6 @@ export async function exportReportToDocx(
         label: dateStr,
         items: [itemDesc],
         keterangan: cleanDocxText(e.kehadiran || 'WFO'),
-      });
-    });
-  } else {
-    // Tahunan
-    [1, 2, 3, 4].forEach((q) => {
-      const qMonths = ({ 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] } as Record<number, number[]>)[q] || [];
-      const qEntries = filtered.filter((e) => qMonths.includes(parseDateDetails(e.tanggal).month));
-      const items = qEntries.map((e) => {
-        if (e.kehadiran === 'Sakit') return `Izin Sakit: ${cleanDocxText(e.keterangan || '-')}`;
-        if (e.kehadiran === 'Cuti') return `Cuti: ${cleanDocxText(e.keterangan || '-')}`;
-        return cleanDocxText(e.uraianPekerjaan);
-      });
-      if (items.length === 0) {
-        items.push('Pelaksanaan tugas operasional dan pemeliharaan kebun');
-      }
-      table1Groups.push({
-        label: `Triwulan ${ROMAN_QUARTERS[q - 1]}`,
-        items,
-        keterangan: `${qEntries.length} Catatan`,
       });
     });
   }
@@ -484,7 +436,7 @@ export async function exportReportToDocx(
               alignment: AlignmentType.CENTER,
               children: [
                 new TextRun({
-                  text: config.tipe === 'bulanan' ? 'Tanggal' : config.tipe === 'triwulan' ? 'Bulan' : 'Periode',
+                  text: 'Tanggal',
                   bold: true,
                 }),
               ],

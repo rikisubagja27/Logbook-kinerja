@@ -157,7 +157,7 @@ function formatIndonesianDate(dateStr: string): string {
 }
 
 export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries, profile, onUpdateEntry, onRecoverPhotos }) => {
-  // Dynamic initialization: Default to 'semua' so all filled logbooks are immediately displayed!
+  // Dynamic initialization: Default ke 'bulanan' resmi (langsung menyesuaikan dengan bulan yang terisi)
   const [reportConfig, setReportConfig] = useState<ReportConfig>(() => {
     const today = new Date();
     const currentYear = today.getFullYear();
@@ -165,7 +165,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
     if (!entries || entries.length === 0) {
       return {
-        tipe: 'semua',
+        tipe: 'bulanan',
         tahun: currentYear,
         bulan: today.getMonth() + 1,
         triwulan: Math.ceil((today.getMonth() + 1) / 3),
@@ -173,7 +173,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
       };
     }
 
-    // Find the primary month that has the most entries filled
+    // Cari bulan dan tahun utama yang memiliki entri logbook terbanyak
     const monthCounts = new Map<string, { year: number; month: number; count: number }>();
     entries.forEach((e) => {
       if (e.tanggal) {
@@ -193,7 +193,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     });
 
     return {
-      tipe: 'semua', // Langsung tampilkan seluruh logbook yang sudah diisi tanpa perlu klik 'semua'!
+      tipe: 'bulanan', // Kategori default resmi: Bulanan (langsung lengkap per tanggal 1 s/d 31)
       tahun: best.year,
       bulan: best.month,
       triwulan: Math.ceil(best.month / 3),
@@ -359,99 +359,46 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     return `Pada ${periodText}, pelaksanaan tugas ${profile.statusKepegawaian || 'pegawai'} jabatan ${profile.jabatan || 'operasional'} telah mendukung kelancaran operasional KPS PVT I Manoko. Kegiatan utama meliputi pengolahan lahan, pemeliharaan, penyiraman, penyiangan dan pengendalian gulma, panen dan penanganan hasil panen, serta pelaksanaan uji BUSS, pembersihan area kerja, pemeliharaan sarana pendukung, dan dukungan kegiatan lainnya yang berhubungan dengan kegiatan operasional kebun. Secara umum kegiatan terlaksana secara tertib, efektif, dan sesuai dengan tugas serta mendukung pencapaian tujuan dan kelancaran tugas organisasi.\n\nDemikian laporan ini disampaikan. Atas perhatian dan kerjasamanya, diucapkan terima kasih.`;
   }, [profile, periodText]);
 
-  // Generate default Table 1 data - Kategori Removed, ordered clean
+  // Generate default Table 1 data - all entries complete and chronologically ordered by date (1 -> 31)
   const defaultTable1Data = useMemo(() => {
     const groups: Table1RowItem[] = [];
 
-    if (reportConfig.tipe === 'bulanan' || reportConfig.tipe === 'semua') {
-      filteredEntries.forEach((e) => {
-        const pd = parseDateDetails(e.tanggal);
-        const dateStr = `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
-        let itemDesc = '';
+    filteredEntries.forEach((e) => {
+      const pd = parseDateDetails(e.tanggal);
+      const dateStr =
+        reportConfig.tipe === 'tahunan'
+          ? `${pd.day} ${MONTH_NAMES[pd.month - 1]} ${pd.year}`
+          : `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
 
-        if (e.kehadiran === 'Sakit') {
-          itemDesc = `Izin Sakit: ${e.keterangan || 'Istirahat Sakit'}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
-        } else if (e.kehadiran === 'Cuti') {
-          itemDesc = `Cuti: ${e.keterangan || 'Cuti Resmi'}`;
-        } else {
-          let desc = e.uraianPekerjaan;
-          const locDetails: string[] = [];
-          if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
-          if (e.luasLahan && e.luasLahan !== '-') {
-            locDetails.push(`Luas: ${/m²|m2/i.test(e.luasLahan) ? e.luasLahan : `${e.luasLahan} m²`}`);
-          }
-          if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
-          if (locDetails.length > 0) {
-            desc += ` (${locDetails.join(', ')})`;
-          }
-          itemDesc = desc;
+      let itemDesc = '';
+
+      if (e.kehadiran === 'Sakit') {
+        itemDesc = `Izin Sakit: ${e.keterangan || 'Istirahat Sakit'}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
+      } else if (e.kehadiran === 'Cuti') {
+        itemDesc = `Cuti: ${e.keterangan || 'Cuti Resmi'}`;
+      } else {
+        let desc = e.uraianPekerjaan;
+        const locDetails: string[] = [];
+        if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
+        if (e.luasLahan && e.luasLahan !== '-') {
+          locDetails.push(`Luas: ${/m²|m2/i.test(e.luasLahan) ? e.luasLahan : `${e.luasLahan} m²`}`);
         }
+        if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
+        if (locDetails.length > 0) {
+          desc += ` (${locDetails.join(', ')})`;
+        }
+        itemDesc = desc;
+      }
 
-        groups.push({
-          label: dateStr,
-          items: [itemDesc],
-          keterangan: e.kehadiran || 'WFO',
-        });
+      groups.push({
+        label: dateStr,
+        items: [itemDesc],
+        keterangan: e.kehadiran || 'WFO',
       });
-    } else if (reportConfig.tipe === 'triwulan') {
-      const quarterMonths = ({
-        1: [1, 2, 3],
-        2: [4, 5, 6],
-        3: [7, 8, 9],
-        4: [10, 11, 12],
-      } as Record<number, number[]>)[reportConfig.triwulan] || [];
-
-      quarterMonths.forEach((m) => {
-        const monthEntries = filteredEntries.filter(
-          (e) => parseDateDetails(e.tanggal).month === m
-        );
-        const items: string[] = [];
-
-        monthEntries.forEach((e) => {
-          if (e.kehadiran === 'Sakit') {
-            items.push(`Izin Sakit: ${e.keterangan || 'Istirahat Sakit'}`);
-          } else if (e.kehadiran === 'Cuti') {
-            items.push(`Cuti: ${e.keterangan || 'Cuti Resmi'}`);
-          } else {
-            const locDetails: string[] = [];
-            if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
-            if (e.luasLahan && e.luasLahan !== '-') {
-              locDetails.push(`Luas: ${/m²|m2/i.test(e.luasLahan) ? e.luasLahan : `${e.luasLahan} m²`}`);
-            }
-            const locInfo = locDetails.length > 0 ? ` (${locDetails.join(', ')})` : '';
-            items.push(`${e.uraianPekerjaan}${locInfo}`);
-          }
-        });
-
-        groups.push({
-          label: MONTH_NAMES[m - 1],
-          items: items.length > 0 ? items : ['Pelaksanaan tugas operasional kebun dan pemeliharaan rutin'],
-          keterangan: monthEntries.length > 0 ? `${monthEntries.length} Catatan` : '-',
-        });
-      });
-    } else {
-      // Tahunan
-      [1, 2, 3, 4].forEach((q) => {
-        const qMonths = ({ 1: [1, 2, 3], 2: [4, 5, 6], 3: [7, 8, 9], 4: [10, 11, 12] } as Record<number, number[]>)[q] || [];
-        const qEntries = filteredEntries.filter((e) =>
-          qMonths.includes(parseDateDetails(e.tanggal).month)
-        );
-        const items = qEntries.map((e) => {
-          if (e.kehadiran === 'Sakit') return `Izin Sakit: ${e.keterangan || '-'}`;
-          if (e.kehadiran === 'Cuti') return `Cuti: ${e.keterangan || '-'}`;
-          return e.uraianPekerjaan;
-        });
-
-        groups.push({
-          label: `Triwulan ${ROMAN_QUARTERS[q - 1]}`,
-          items: items.length > 0 ? items : ['Pelaksanaan tugas operasional dan pemeliharaan kebun'],
-          keterangan: `${qEntries.length} Catatan`,
-        });
-      });
-    }
+    });
 
     return groups;
-  }, [filteredEntries, reportConfig]);
+  }, [filteredEntries, reportConfig.tipe]);
 
   // Generate default photos: REQUIREMENT -> ONLY "Foto Sebelum" enters the official report, and ONLY for WFO entries!
   const defaultPhotos = useMemo(() => {
@@ -619,23 +566,29 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   // Maximizes space on each A4 page so table rows fill the page neatly without massive empty gaps
   const table1Pages = useMemo(() => {
     if (customTable1.length === 0) return [[]];
-    // If 10 rows or fewer, fits cleanly on a single page
-    if (customTable1.length <= 10) return [customTable1];
+    const maxPage0 = 15;
+    const maxContinuation = 19;
 
-    // If between 11 and 20 rows, balance across 2 pages (e.g. 8 & 8, or 9 & 7, or 10 & 10)
-    if (customTable1.length <= 20) {
-      const page1Count = Math.ceil(customTable1.length / 2);
+    // If 15 rows or fewer, fits cleanly on a single page!
+    if (customTable1.length <= maxPage0) return [customTable1];
+
+    // If between 16 and 34 rows, balance across 2 pages (so neither page looks empty or sparse)
+    if (customTable1.length <= maxPage0 + maxContinuation) {
+      const page0Count = Math.min(
+        maxPage0,
+        Math.max(Math.ceil(customTable1.length * 0.52), customTable1.length - maxContinuation)
+      );
       return [
-        customTable1.slice(0, page1Count),
-        customTable1.slice(page1Count)
+        customTable1.slice(0, page0Count),
+        customTable1.slice(page0Count)
       ];
     }
 
-    // For larger sets (>20 rows): Page 0 holds 10 rows, continuation pages hold up to 12 rows each
+    // For larger sets (>34 rows, e.g. Triwulan or Tahunan): Page 0 holds 15 rows, continuation pages hold up to 19 rows each
     const pages: Table1RowItem[][] = [];
-    pages.push(customTable1.slice(0, 10));
-    for (let i = 10; i < customTable1.length; i += 12) {
-      pages.push(customTable1.slice(i, i + 12));
+    pages.push(customTable1.slice(0, maxPage0));
+    for (let i = maxPage0; i < customTable1.length; i += maxContinuation) {
+      pages.push(customTable1.slice(i, i + maxContinuation));
     }
     return pages;
   }, [customTable1]);
@@ -1250,13 +1203,13 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         {/* Category & Period Selectors with Hide Toggle to save vertical space */}
         {!isPanelHidden ? (
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-1 animate-fade-in">
-            {/* Kategori Laporan (Diperbesar) */}
+            {/* Kategori Laporan (Hanya Bulanan, Triwulan, Tahunan) */}
             <div className="sm:col-span-2">
               <label className="block text-xs font-semibold text-stone-300 mb-1.5">
-                Kategori Laporan (Pilih Periode / Semua)
+                Kategori Laporan (Pilih Periode)
               </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1 bg-stone-900 p-1 rounded-xl border border-stone-700">
-                {(['semua', 'bulanan', 'triwulan', 'tahunan'] as ReportType[]).map((tipe) => (
+              <div className="grid grid-cols-3 gap-1 bg-stone-900 p-1 rounded-xl border border-stone-700">
+                {(['bulanan', 'triwulan', 'tahunan'] as const).map((tipe) => (
                   <button
                     key={tipe}
                     type="button"
@@ -1267,7 +1220,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                         : 'text-stone-400 hover:text-white hover:bg-stone-800'
                     }`}
                   >
-                    {tipe === 'semua' ? `Semua (${entries.length})` : tipe}
+                    {tipe}
                   </button>
                 ))}
               </div>
@@ -1428,18 +1381,9 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         <div className="flex items-center gap-2">
           <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
           <span>
-            <strong>Status Laporan:</strong> Menampilkan <strong>{filteredEntries.length} kegiatan</strong> &amp; <strong>{defaultPhotos.length} foto</strong> (dari total <strong>{entries.length}</strong> logbook tersimpan).
+            <strong>Status Laporan:</strong> Menampilkan <strong>{filteredEntries.length} kegiatan lengkap</strong> &amp; <strong>{defaultPhotos.length} foto</strong> untuk periode <strong>{reportConfig.tipe === 'bulanan' ? `Bulan ${MONTH_NAMES[reportConfig.bulan - 1]}` : reportConfig.tipe === 'triwulan' ? `Triwulan ${reportConfig.triwulan}` : 'Tahunan'} {reportConfig.tahun}</strong> (tersusun berurutan tanggal 1 s/d 31).
           </span>
         </div>
-        {reportConfig.tipe !== 'semua' && entries.length > filteredEntries.length && (
-          <button
-            type="button"
-            onClick={() => setReportConfig((prev) => ({ ...prev, tipe: 'semua' }))}
-            className="text-[11px] font-bold text-amber-300 hover:text-white bg-black/50 hover:bg-emerald-800 px-3 py-1 rounded-lg border border-amber-500/40 transition-colors cursor-pointer shrink-0 self-start sm:self-auto"
-          >
-            Tampilkan Seluruh {entries.length} Catatan Sekaligus ↗
-          </button>
-        )}
       </div>
 
       {/* ========================================================================= */}
@@ -1626,30 +1570,26 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                   <div style={{ border: '1px solid #000000', width: '100%', boxSizing: 'border-box' }}>
                     <table className="w-full text-left text-[11pt] border-collapse font-sans" style={{ width: '100%', tableLayout: 'fixed', borderCollapse: 'collapse', border: '1px solid #000000' }}>
                       <thead>
-                        <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #000000' }} className="font-bold">
-                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '8%', boxSizing: 'border-box' }}>No.</th>
-                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '22%', boxSizing: 'border-box' }}>
-                            {reportConfig.tipe === 'bulanan' || reportConfig.tipe === 'semua'
-                              ? 'Tanggal'
-                              : reportConfig.tipe === 'triwulan'
-                              ? 'Bulan'
-                              : 'Periode'}
+                        <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #000000' }} className="font-bold text-[10.5pt]">
+                          <th style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', width: '8%', boxSizing: 'border-box' }}>No.</th>
+                          <th style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', width: '22%', boxSizing: 'border-box' }}>
+                            Tanggal
                           </th>
-                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '54%', boxSizing: 'border-box' }}>
+                          <th style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', width: '54%', boxSizing: 'border-box' }}>
                             Rincian Pekerjaan
                           </th>
-                          <th style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', width: '16%', boxSizing: 'border-box' }}>Keterangan</th>
+                          <th style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', width: '16%', boxSizing: 'border-box' }}>Keterangan</th>
                         </tr>
                       </thead>
                       <tbody>
                         {pageRows.map((row, rowIdx) => {
                           const actualIdx = globalStartIndex + rowIdx;
                           return (
-                            <tr key={actualIdx} style={{ borderBottom: '1px solid #000000' }} className="align-top">
-                              <td style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', wordBreak: 'break-word', boxSizing: 'border-box' }} className="font-medium">
+                            <tr key={actualIdx} style={{ borderBottom: '1px solid #000000' }} className="align-top text-[10.5pt]">
+                              <td style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', wordBreak: 'break-word', boxSizing: 'border-box' }} className="font-medium">
                                 {actualIdx + 1}
                               </td>
-                              <td style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', wordBreak: 'break-word', boxSizing: 'border-box' }} className="font-semibold">
+                              <td style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', wordBreak: 'break-word', boxSizing: 'border-box' }} className="font-semibold">
                                 {isEditMode ? (
                                   <input
                                     type="text"
@@ -1666,7 +1606,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                   row.label
                                 )}
                               </td>
-                              <td style={{ border: '1px solid #000000', padding: '8px', wordBreak: 'break-word', boxSizing: 'border-box' }} className="space-y-1.5">
+                              <td style={{ border: '1px solid #000000', padding: '5px 8px', wordBreak: 'break-word', boxSizing: 'border-box' }} className="space-y-1">
                                 {isEditMode ? (
                                   <textarea
                                     rows={2}
@@ -1681,14 +1621,14 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                   />
                                 ) : (
                                   row.items.map((it, itemIdx) => (
-                                    <div key={itemIdx} className="leading-relaxed">
+                                    <div key={itemIdx} className="leading-snug">
                                       <span className="font-semibold">• </span>
                                       <span>{it}</span>
                                     </div>
                                   ))
                                 )}
                               </td>
-                              <td style={{ border: '1px solid #000000', padding: '8px', textAlign: 'center', fontSize: '11px', wordBreak: 'break-word', boxSizing: 'border-box' }} className="text-stone-700">
+                              <td style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', fontSize: '10.5pt', wordBreak: 'break-word', boxSizing: 'border-box' }} className="text-stone-700">
                                 {isEditMode ? (
                                   <input
                                     type="text"
