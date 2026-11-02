@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef } from 'react';
-import DikteCepat from "./DikteCepat";
 import { 
   AttendanceStatus, 
   JobCategory, 
@@ -56,20 +55,6 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
   const fileInputSesudahRef = useRef<HTMLInputElement | null>(null);
   const fileInputSuratRef = useRef<HTMLInputElement | null>(null);
   const formTopRef = useRef<HTMLDivElement | null>(null);
-
-  // Membaca perintah Shortcut Dikte iPhone
-useEffect(() => {
-  const params = new URLSearchParams(window.location.search);
-
-  if (params.get("mode") === "dikte") {
-    requestAnimationFrame(() => {
-      document.getElementById("dikte-cepat")?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    });
-  }
-}, []);
 
   const triggerUploadSebelum = () => {
     if (fileInputSebelumRef.current) {
@@ -467,24 +452,6 @@ useEffect(() => {
           )}
         </div>
       )}
-      {/* Dikte Cepat Logbook */}
-<div id="dikte-cepat">
-  <DikteCepat
-  onSave={async (data) => {
-    await onAddEntry({
-      ...data,
-      jamSelesai: "",
-      lokasiBlok: "",
-      luasLokasi: "",
-      keterangan: "",
-      fotoSebelumUrl: "",
-      fotoSesudahUrl: "",
-      fotoSuratSakitUrl: "",
-      showInReport: true,
-    });
-  }}
-/>
-</div>
 
       {/* Toast Notification */}
       {showSuccessToast && (
