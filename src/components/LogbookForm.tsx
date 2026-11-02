@@ -57,6 +57,20 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
   const fileInputSuratRef = useRef<HTMLInputElement | null>(null);
   const formTopRef = useRef<HTMLDivElement | null>(null);
 
+  // Membaca perintah Shortcut Dikte iPhone
+useEffect(() => {
+  const params = new URLSearchParams(window.location.search);
+
+  if (params.get("mode") === "dikte") {
+    requestAnimationFrame(() => {
+      document.getElementById("dikte-cepat")?.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    });
+  }
+}, []);
+
   const triggerUploadSebelum = () => {
     if (fileInputSebelumRef.current) {
       fileInputSebelumRef.current.value = '';
@@ -454,7 +468,8 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
         </div>
       )}
       {/* Dikte Cepat Logbook */}
-<DikteCepat
+<div id="dikte-cepat">
+  <DikteCepat
   onSave={async (data) => {
     await onAddEntry({
       ...data,
@@ -469,6 +484,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
     });
   }}
 />
+</div>
 
       {/* Toast Notification */}
       {showSuccessToast && (
