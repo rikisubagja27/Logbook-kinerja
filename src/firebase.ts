@@ -245,6 +245,57 @@ export async function fetchCloudEntries(userId: string): Promise<LogbookEntry[]>
   }
 }
 
+// Fitur Pemulihan Penuh (Restore) dari Cloud Firestore:
+// Mengambil salinan lengkap arsip logbook dan foto dokumentasi langsung dari server Firestore
+export async function restoreUserDataFromCloud(userId: string): Promise<{
+  entries: LogbookEntry[];
+  profile?: UserProfile;
+}> {
+  if (!userId) return { entries: [] };
+  const entriesCol = collection(db, 'users', userId, 'logbookEntries');
+  const list: LogbookEntry[] = [];
+
+  // 1. Coba ambil langsung dari server Firestore
+  try {
+    const serverSnap = await getDocsFromServer(entriesCol);
+    serverSnap.forEach((docSnap) => {
+      const data = docSnap.data() as LogbookEntry;
+      if (data && data.id) {
+        list.push(data);
+      }
+    });
+  } catch (serverErr) {
+    console.warn('Server fetch notice (falling back to cache):', serverErr);
+  }
+
+  // 2. Fallback jika offline / server cache
+  if (list.length === 0) {
+    try {
+      const snap = await getDocs(entriesCol);
+      snap.forEach((docSnap) => {
+        const data = docSnap.data() as LogbookEntry;
+        if (data && data.id) {
+          list.push(data);
+        }
+      });
+    } catch (e) {
+      console.warn('Fallback getDocs error:', e);
+    }
+  }
+
+  // 3. Ambil juga profil tersimpan dari cloud
+  let cloudProfile: UserProfile | undefined;
+  try {
+    const profRef = doc(db, 'users', userId, 'profile', 'main');
+    const profSnap = await getDocFromServer(profRef).catch(() => null);
+    if (profSnap && profSnap.exists()) {
+      cloudProfile = profSnap.data() as UserProfile;
+    }
+  } catch (_) {}
+
+  return { entries: list, profile: cloudProfile };
+}
+
 // Check redirect login result for mobile / standalone PWA browsers
 export async function handleGoogleRedirectResult(): Promise<ActiveSyncUser | null> {
   try {

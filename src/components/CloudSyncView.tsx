@@ -21,7 +21,8 @@ import {
   Sparkles,
   KeyRound,
   ExternalLink,
-  Copy
+  Copy,
+  RotateCcw
 } from 'lucide-react';
 
 interface CloudSyncViewProps {
@@ -33,6 +34,7 @@ interface CloudSyncViewProps {
   onAccountConnected?: (account: ActiveSyncUser) => void;
   onLogout?: () => void;
   onManualSync?: () => void;
+  onRestoreFromCloud?: () => Promise<{ success: boolean; count: number; error?: string }>;
   onNavigateToProfile?: () => void;
   onNavigateToEpersonal?: () => void;
 }
@@ -46,10 +48,12 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({
   onAccountConnected,
   onLogout,
   onManualSync,
+  onRestoreFromCloud,
   onNavigateToProfile,
   onNavigateToEpersonal,
 }) => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [customEmail, setCustomEmail] = useState('');
   const [showCustomInput, setShowCustomInput] = useState(false);
@@ -127,6 +131,25 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({
       } catch (err) {
         console.error('Logout error:', err);
       }
+    }
+  };
+
+  const handleExecuteRestore = async () => {
+    if (!onRestoreFromCloud) return;
+    try {
+      setIsRestoring(true);
+      setErrorMsg(null);
+      const res = await onRestoreFromCloud();
+      if (res.success) {
+        triggerToast(`Berhasil memulihkan ${res.count} catatan logbook & seluruh foto lengkap dari Cloud!`);
+      } else {
+        setErrorMsg(res.error || 'Gagal memulihkan cadangan dari Google Cloud.');
+      }
+    } catch (err: any) {
+      console.error('Execute restore error:', err);
+      setErrorMsg(err?.message || 'Gagal memulihkan data dari cloud.');
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -277,6 +300,41 @@ export const CloudSyncView: React.FC<CloudSyncViewProps> = ({
               <span className="text-[11px] text-stone-500 mt-1 block">
                 Aplikasi ditutup tidak akan me-logout akun Anda
               </span>
+            </div>
+          </div>
+
+          {/* FITUR PEMULIHAN CADANGAN DATA DARI CLOUD (RESTORE) */}
+          <div className="bg-gradient-to-br from-emerald-950 via-stone-900 to-emerald-950 border-2 border-emerald-500/50 rounded-2xl p-5 text-white space-y-3.5 shadow-lg">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-300 shrink-0">
+                    <RotateCcw className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white flex items-center gap-2">
+                      <span>Pulihkan Data dari Cloud (Restore)</span>
+                      <span className="text-[10px] bg-emerald-500/30 text-emerald-300 font-bold px-2 py-0.2 rounded-full border border-emerald-400/40">
+                        Jaga-Jaga Data Hilang
+                      </span>
+                    </h3>
+                  </div>
+                </div>
+                <p className="text-xs text-stone-300 leading-relaxed max-w-xl">
+                  Apabila data catatan logbook atau foto dokumentasi di HP/laptop Anda tiba-tiba hilang, terhapus, atau belum muncul, ketuk tombol pulihkan ini. Sistem akan mengunduh kembali seluruh riwayat logbook dan foto dokumentasi lengkap yang tersimpan di akun Google Cloud Anda.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={handleExecuteRestore}
+                disabled={isRestoring || isSyncing}
+                className="px-5 py-3 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-bold text-xs rounded-xl shadow-xl shadow-emerald-950/60 transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 shrink-0 border border-emerald-300/40 self-start sm:self-center"
+                title="Pulihkan seluruh data dan foto dari Google Cloud Firestore"
+              >
+                <RotateCcw className={`w-4 h-4 text-emerald-200 ${isRestoring ? 'animate-spin' : ''}`} />
+                <span>{isRestoring ? 'Memulihkan Data dari Cloud...' : 'Pulihkan Data & Foto dari Cloud'}</span>
+              </button>
             </div>
           </div>
 

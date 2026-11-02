@@ -77,7 +77,16 @@ export function createSamplePhotoSvg(label: string, sub: string, bgColor = '#e2e
   return createDatedPhotoSvg(label, sub, undefined, bgColor, textColor);
 }
 
-export const INITIAL_LOGBOOK_ENTRIES: LogbookEntry[] = [
+// Logbook awal untuk pengguna baru / perangkat baru: SELALU KOSONG (0 entri)
+export const INITIAL_LOGBOOK_ENTRIES: LogbookEntry[] = [];
+
+// Deteksi apakah sebuah entri merupakan entri contoh / sampel lawas
+export function isDummySampleEntry(id: string): boolean {
+  if (!id) return false;
+  return id.startsWith('entry-jul-') || id.startsWith('entry-aug-') || id.startsWith('entry-sep-');
+}
+
+export const SAMPLE_ARCHIVE_ENTRIES: LogbookEntry[] = [
   // --- JULI 2026 ---
   {
     id: 'entry-jul-1',
@@ -688,18 +697,25 @@ export function loadLogbookEntries(): LogbookEntry[] {
   try {
     const raw = localStorage.getItem(LOGBOOK_STORAGE_KEY);
     if (!raw) {
-      const sorted = sortLogbookEntriesByDateAscending(INITIAL_LOGBOOK_ENTRIES);
-      saveLogbookEntries(sorted);
-      return sorted;
+      saveLogbookEntries([]);
+      return [];
     }
     const parsed = JSON.parse(raw);
-    const list = Array.isArray(parsed) ? parsed : INITIAL_LOGBOOK_ENTRIES;
-    // Auto-heal: jika ada entri lama yang fotonya hilang, otomatis pulihkan sesuai tanggal
+    const list = Array.isArray(parsed) ? parsed : [];
+    
+    // Jika semua data yang tersimpan di perangkat hanya berupa entri contoh bawaan lama,
+    // bersihkan otomatis agar pengguna baru atau penerima link berbagi selalu melihat logbook kosong
+    if (list.length > 0 && list.every((e) => isDummySampleEntry(e.id))) {
+      saveLogbookEntries([]);
+      return [];
+    }
+
+    // Auto-heal: jika ada entri riil yang fotonya hilang, otomatis pulihkan sesuai tanggal
     const { updatedEntries } = recoverAllLogbookPhotos(list);
     return sortLogbookEntriesByDateAscending(updatedEntries);
   } catch (err) {
     console.error('Error loading logbook entries:', err);
-    return sortLogbookEntriesByDateAscending(INITIAL_LOGBOOK_ENTRIES);
+    return [];
   }
 }
 

@@ -15,7 +15,8 @@ import {
   mergeCloudNipDirectory,
   initRosterFromIDB,
   loadNipDirectory,
-  recoverAllLogbookPhotos
+  recoverAllLogbookPhotos,
+  isDummySampleEntry
 } from './utils/storage';
 import { 
   auth, 
@@ -29,7 +30,8 @@ import {
   syncAllEmployeesToCloud,
   handleGoogleRedirectResult,
   ActiveSyncUser,
-  getDeterministicUserId
+  getDeterministicUserId,
+  restoreUserDataFromCloud
 } from './firebase';
 import { 
   getAllEntriesFromIDB, 
@@ -148,12 +150,33 @@ export default function App() {
 
     // 5. Load all entries from high-capacity IndexedDB to ensure daily entries and photos are never lost
     getAllEntriesFromIDB().then((idbEntries) => {
+      // Cek apakah halaman dibuka dengan mode baru / dibagikan (?mode=baru atau ?share=new)
+      try {
+        const url = new URL(window.location.href);
+        if (
+          url.searchParams.get('mode') === 'baru' || 
+          url.searchParams.get('share') === 'new' ||
+          url.searchParams.get('baru') === '1'
+        ) {
+          setEntries([]);
+          saveLogbookEntries([]);
+          return;
+        }
+      } catch (_) {}
+
+      // Jika data IDB hanya berupa entri sampel lawas, jangan masukkan
+      if (idbEntries && idbEntries.length > 0 && idbEntries.every((e) => isDummySampleEntry(e.id))) {
+        setEntries([]);
+        saveLogbookEntries([]);
+        return;
+      }
+
       setEntries((prev) => {
         const map = new Map<string, LogbookEntry>();
-        prev.forEach((e) => map.set(e.id, e));
+        prev.filter((e) => !isDummySampleEntry(e.id)).forEach((e) => map.set(e.id, e));
 
         if (idbEntries && idbEntries.length > 0) {
-          idbEntries.forEach((idbEntry) => {
+          idbEntries.filter((e) => !isDummySampleEntry(e.id)).forEach((idbEntry) => {
             const current = map.get(idbEntry.id);
             // Prioritize whichever has photos
             const fotoSebelum = idbEntry.fotoSebelum || current?.fotoSebelum;
@@ -167,7 +190,6 @@ export default function App() {
         }
 
         const merged = sortLogbookEntriesByDateAscending(Array.from(map.values()));
-        // Auto-heal: Ensure all entries have photos matching their exact dates
         const { updatedEntries } = recoverAllLogbookPhotos(merged);
         saveLogbookEntries(updatedEntries);
         return updatedEntries;
@@ -179,6 +201,45 @@ export default function App() {
       unsubscribeEmployees();
       window.removeEventListener('kps-nip-directory-updated', handleDirectoryUpdated);
     };
+  }, []);
+
+  // Bersihkan parameter url dan inisialisasi aplikasi bersih jika dibagikan (?mode=baru)
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const isShareNew = 
+        url.searchParams.get('mode') === 'baru' ||
+        url.searchParams.get('share') === 'new' ||
+        url.searchParams.get('baru') === '1' ||
+        url.searchParams.get('bagikan') === '1';
+
+      if (isShareNew) {
+        // Otomatis kosongkan logbook untuk pengguna/perangkat baru
+        saveLogbookEntries([]);
+        setEntries([]);
+      }
+
+      if (
+        url.searchParams.has('mode') ||
+        url.searchParams.has('action') ||
+        url.searchParams.has('dikte') ||
+        url.searchParams.has('share') ||
+        url.searchParams.has('baru') ||
+        url.searchParams.has('bagikan') ||
+        url.hash === '#dikte' ||
+        url.hash === '#/dikte'
+      ) {
+        url.searchParams.delete('mode');
+        url.searchParams.delete('action');
+        url.searchParams.delete('dikte');
+        url.searchParams.delete('share');
+        url.searchParams.delete('baru');
+        url.searchParams.delete('bagikan');
+        const cleanQuery = url.searchParams.toString() ? `?${url.searchParams.toString()}` : '';
+        const cleanHash = (url.hash === '#dikte' || url.hash === '#/dikte') ? '' : url.hash;
+        window.history.replaceState({}, document.title, url.pathname + cleanQuery + cleanHash);
+      }
+    } catch (_) {}
   }, []);
 
   // Listen to Firestore Realtime Data when user is logged in
@@ -197,17 +258,21 @@ export default function App() {
       });
 
       if (cloudEntries.length === 0 && !isInitialSyncRef.current) {
-        // If cloud database is empty, seed it with the current local entries so data is preserved!
+        // If cloud database is empty, only seed if local entries are real non-dummy entries!
         isInitialSyncRef.current = true;
-        const localList = loadLogbookEntries();
+        const localList = loadLogbookEntries().filter((e) => !isDummySampleEntry(e.id));
         if (localList.length > 0) {
           batchSyncEntriesToCloud(currentUser.uid, localList);
+        } else {
+          // New user starts completely blank
+          setEntries([]);
+          saveLogbookEntries([]);
         }
       } else if (cloudEntries.length > 0) {
-        // MERGE: Keep union of local and cloud entries, never wipe out local photos
+        // MERGE: Keep union of local and cloud entries, never include dummy entries
         setEntries((prev) => {
           const map = new Map<string, LogbookEntry>();
-          cloudEntries.forEach((cloudEntry) => {
+          cloudEntries.filter((e) => !isDummySampleEntry(e.id)).forEach((cloudEntry) => {
             const local = prev.find((p) => p.id === cloudEntry.id);
             const fotoSebelum = cloudEntry.fotoSebelum || local?.fotoSebelum;
             const fotoSesudah = cloudEntry.fotoSesudah || local?.fotoSesudah;
@@ -218,7 +283,7 @@ export default function App() {
             });
           });
           // Preserve any local entries that aren't yet in cloud, and upload them
-          prev.forEach((e) => {
+          prev.filter((e) => !isDummySampleEntry(e.id)).forEach((e) => {
             if (!map.has(e.id)) {
               map.set(e.id, e);
               syncEntryToCloud(currentUser.uid, e);
@@ -379,6 +444,49 @@ export default function App() {
     return result;
   }, [currentUser]);
 
+  // Fitur Pemulihan Cadangan Data (Restore): Mengambil seluruh logbook dan foto dari Cloud Firestore
+  const handleRestoreFromCloud = useCallback(async (): Promise<{ success: boolean; count: number; error?: string }> => {
+    if (!currentUser) {
+      return { success: false, count: 0, error: 'Silakan masuk dengan akun Google terlebih dahulu untuk memulihkan data.' };
+    }
+    setIsSyncing(true);
+    try {
+      const { entries: cloudList, profile: cloudProfile } = await restoreUserDataFromCloud(currentUser.uid);
+      if (!cloudList || cloudList.length === 0) {
+        return { 
+          success: false, 
+          count: 0, 
+          error: `Tidak ditemukan data cadangan di akun Google Cloud (${currentUser.email}). Pastikan akun Google yang Anda hubungkan sudah benar.` 
+        };
+      }
+
+      const nonDummy = cloudList.filter((e) => !isDummySampleEntry(e.id));
+      const targetList = nonDummy.length > 0 ? nonDummy : cloudList;
+      const sorted = sortLogbookEntriesByDateAscending(targetList);
+      const { updatedEntries } = recoverAllLogbookPhotos(sorted);
+
+      saveLogbookEntries(updatedEntries);
+      if (updatedEntries.length > 0) {
+        for (const item of updatedEntries) {
+          await saveSingleEntryToIDB(item);
+        }
+      }
+
+      if (cloudProfile) {
+        saveUserProfile(cloudProfile);
+        setProfile(cloudProfile);
+      }
+
+      setEntries(updatedEntries);
+      return { success: true, count: updatedEntries.length };
+    } catch (err: any) {
+      console.error('Failed to restore from cloud:', err);
+      return { success: false, count: 0, error: err?.message || 'Gagal memulihkan cadangan data dari Google Cloud.' };
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [currentUser]);
+
   return (
     <div className="min-h-screen app-bg-gradient flex flex-col font-sans text-stone-900 selection:bg-emerald-400 selection:text-stone-950">
       {/* Top Header */}
@@ -451,6 +559,7 @@ export default function App() {
             onAccountConnected={(acc) => setCurrentUser(acc)}
             onLogout={() => setCurrentUser(null)}
             onManualSync={currentUser ? handleManualSync : undefined}
+            onRestoreFromCloud={handleRestoreFromCloud}
             onNavigateToProfile={() => setActiveTab('profile')}
             onNavigateToEpersonal={() => setActiveTab('epersonal')}
           />

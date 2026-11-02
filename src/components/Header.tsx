@@ -128,7 +128,7 @@ export function Header({
             </div>
 
             {/* Profil di Pojok Kanan Atas untuk Layar Mobile */}
-            <div className="md:hidden">
+            <div className="md:hidden flex items-center gap-2">
               {userProfileBadgeElement}
             </div>
           </div>
@@ -138,7 +138,6 @@ export function Header({
             aria-label="Menu Navigasi Utama" 
             className="flex items-center gap-1 sm:gap-1.5 p-1 bg-stone-950/80 border border-stone-800/90 rounded-xl sm:rounded-2xl shadow-inner backdrop-blur-md overflow-x-auto w-full md:w-auto justify-start md:justify-center scrollbar-none"
           >
-            
             {/* Menu Mandiri: Isi Logbook */}
             <button
               type="button"
@@ -295,7 +294,7 @@ export function Header({
           </nav>
 
           {/* Profil di Pojok Kanan Atas untuk Layar Desktop (md ke atas) */}
-          <div className="hidden md:flex items-center">
+          <div className="hidden md:flex items-center gap-3">
             {userProfileBadgeElement}
           </div>
 
