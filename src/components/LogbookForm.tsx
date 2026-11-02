@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import DikteCepat from "./DikteCepat";
 import { 
   AttendanceStatus, 
   JobCategory, 
@@ -452,6 +453,22 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
           )}
         </div>
       )}
+      {/* Dikte Cepat Logbook */}
+<DikteCepat
+  onSave={async (data) => {
+    await onAddEntry({
+      ...data,
+      jamSelesai: "",
+      lokasiBlok: "",
+      luasLokasi: "",
+      keterangan: "",
+      fotoSebelumUrl: "",
+      fotoSesudahUrl: "",
+      fotoSuratSakitUrl: "",
+      showInReport: true,
+    });
+  }}
+/>
 
       {/* Toast Notification */}
       {showSuccessToast && (
