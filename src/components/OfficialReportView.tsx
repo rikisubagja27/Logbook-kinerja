@@ -30,7 +30,9 @@ import {
   CheckCircle2,
   ChevronUp,
   ChevronDown,
-  FlaskConical,
+  Sparkles,
+  Bot,
+  Wand2,
   Share2,
   ExternalLink,
   AlertCircle,
@@ -42,6 +44,12 @@ import {
   Square,
   Filter
 } from 'lucide-react';
+import { 
+  summarizeReport, 
+  generateLocalReportSummary,
+  AiSummarizeResult, 
+  OFFICIAL_CATEGORIES 
+} from '../utils/aiReportSummarizer';
 import { 
   parseDateDetails, 
   parseDateScore, 
@@ -207,9 +215,13 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
   const [isEditMode, setIsEditMode] = useState(false);
   const [isPanelHidden, setIsPanelHidden] = useState(false);
 
-  // Diagnostic Test & Mobile PDF state
-  const [diagnosticData, setDiagnosticData] = useState<PdfDiagnosticData | null>(null);
-  const [isTestingPdf, setIsTestingPdf] = useState(false);
+  // AI Summarization State for Quarterly & Annual Official Reports
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const [isSummarizingAi, setIsSummarizingAi] = useState(false);
+  const [aiSummaryResult, setAiSummaryResult] = useState<AiSummarizeResult | null>(null);
+  const [isUsingAiSummary, setIsUsingAiSummary] = useState(false);
+
+  // Ready PDF info for mobile download/share
   const [readyPdfInfo, setReadyPdfInfo] = useState<{
     blob: Blob;
     url: string;
@@ -359,46 +371,63 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     return `Pada ${periodText}, pelaksanaan tugas ${profile.statusKepegawaian || 'pegawai'} jabatan ${profile.jabatan || 'operasional'} telah mendukung kelancaran operasional KPS PVT I Manoko. Kegiatan utama meliputi pengolahan lahan, pemeliharaan, penyiraman, penyiangan dan pengendalian gulma, panen dan penanganan hasil panen, serta pelaksanaan uji BUSS, pembersihan area kerja, pemeliharaan sarana pendukung, dan dukungan kegiatan lainnya yang berhubungan dengan kegiatan operasional kebun. Secara umum kegiatan terlaksana secara tertib, efektif, dan sesuai dengan tugas serta mendukung pencapaian tujuan dan kelancaran tugas organisasi.\n\nDemikian laporan ini disampaikan. Atas perhatian dan kerjasamanya, diucapkan terima kasih.`;
   }, [profile, periodText]);
 
-  // Generate default Table 1 data - all entries complete and chronologically ordered by date (1 -> 31)
+  // Generate default Table 1 data:
+  // - For 'bulanan': Rincian harian lengkap berurutan secara kronologis (1 -> 31)
+  // - For 'triwulan' & 'tahunan': Otomatis berformat rangkuman bulanan terpadu per 9 kategori kedinasan resmi Kementerian Pertanian
   const defaultTable1Data = useMemo(() => {
-    const groups: Table1RowItem[] = [];
+    if (reportConfig.tipe === 'bulanan') {
+      const groups: Table1RowItem[] = [];
 
-    filteredEntries.forEach((e) => {
-      const pd = parseDateDetails(e.tanggal);
-      const dateStr =
-        reportConfig.tipe === 'tahunan'
-          ? `${pd.day} ${MONTH_NAMES[pd.month - 1]} ${pd.year}`
-          : `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
+      filteredEntries.forEach((e) => {
+        const pd = parseDateDetails(e.tanggal);
+        const dateStr = `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
 
-      let itemDesc = '';
+        let itemDesc = '';
 
-      if (e.kehadiran === 'Sakit') {
-        itemDesc = `Izin Sakit: ${e.keterangan || 'Istirahat Sakit'}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
-      } else if (e.kehadiran === 'Cuti') {
-        itemDesc = `Cuti: ${e.keterangan || 'Cuti Resmi'}`;
-      } else {
-        let desc = e.uraianPekerjaan;
-        const locDetails: string[] = [];
-        if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
-        if (e.luasLahan && e.luasLahan !== '-') {
-          locDetails.push(`Luas: ${/m²|m2/i.test(e.luasLahan) ? e.luasLahan : `${e.luasLahan} m²`}`);
+        if (e.kehadiran === 'Sakit') {
+          itemDesc = `Izin Sakit: ${e.keterangan || 'Istirahat Sakit'}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
+        } else if (e.kehadiran === 'Cuti') {
+          itemDesc = `Cuti: ${e.keterangan || 'Cuti Resmi'}`;
+        } else {
+          let desc = e.uraianPekerjaan;
+          const locDetails: string[] = [];
+          if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${e.lokasiPekerjaan}`);
+          if (e.luasLahan && e.luasLahan !== '-') {
+            locDetails.push(`Luas: ${/m²|m2/i.test(e.luasLahan) ? e.luasLahan : `${e.luasLahan} m²`}`);
+          }
+          if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
+          if (locDetails.length > 0) {
+            desc += ` (${locDetails.join(', ')})`;
+          }
+          itemDesc = desc;
         }
-        if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${e.keterangan}`);
-        if (locDetails.length > 0) {
-          desc += ` (${locDetails.join(', ')})`;
-        }
-        itemDesc = desc;
-      }
 
-      groups.push({
-        label: dateStr,
-        items: [itemDesc],
-        keterangan: e.kehadiran || 'WFO',
+        groups.push({
+          label: dateStr,
+          items: [itemDesc],
+          keterangan: e.kehadiran || 'WFO',
+        });
       });
+
+      return groups;
+    }
+
+    // For Triwulan & Tahunan: Otomatis hasilkan format rangkuman bulanan
+    // (misal Triwulan IV: baris Oktober, November, Desember; Tahunan: Januari s/d Desember)
+    const summary = generateLocalReportSummary(filteredEntries, reportConfig);
+    const groups: Table1RowItem[] = summary.months.map((m) => {
+      const items = m.categories.length > 0
+        ? m.categories.map((c) => `${c.categoryTitle} : ${c.summary}`)
+        : ['Tidak ada catatan kegiatan operasional pada bulan ini'];
+      return {
+        label: m.monthName,
+        items,
+        keterangan: m.categories.length > 0 ? (m.keterangan || 'WFO / Kedinasan') : '-',
+      };
     });
 
     return groups;
-  }, [filteredEntries, reportConfig.tipe]);
+  }, [filteredEntries, reportConfig]);
 
   // Generate default photos: REQUIREMENT -> ONLY "Foto Sebelum" enters the official report, and ONLY for WFO entries!
   const defaultPhotos = useMemo(() => {
@@ -969,124 +998,56 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
     }
   };
 
-  // TEST PDF EXPORT DIAGNOSTIC FUNCTION (Targets DOM, logs dimensions to console, tests smaller scale)
-  const handleTestPdfExport = async () => {
-    try {
-      setIsTestingPdf(true);
-      const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-      const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-      const isTablet = isIOS && (window.innerWidth >= 768 || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && !/iPhone|iPod/.test(navigator.userAgent)));
-      
-      let deviceType: 'iPhone' | 'iPad' | 'Android' | 'Desktop' = 'Desktop';
-      if (isIOS) {
-        deviceType = isTablet ? 'iPad' : 'iPhone';
-      } else if (isAndroid) {
-        deviceType = 'Android';
-      }
-
-      const pages = document.querySelectorAll<HTMLElement>('.report-page');
-      if (pages.length === 0) {
-        throw new Error('Elemen halaman laporan (.report-page) tidak ditemukan di DOM');
-      }
-
-      const targetElem = pages[0];
-      const rect = targetElem.getBoundingClientRect();
-      const domDim = {
-        offsetW: targetElem.offsetWidth,
-        offsetH: targetElem.offsetHeight,
-        clientW: targetElem.clientWidth,
-        clientH: targetElem.clientHeight,
-        rectW: Math.round(rect.width),
-        rectH: Math.round(rect.height),
-      };
-
-      const screenDim = {
-        w: window.innerWidth,
-        h: window.innerHeight,
-        dpr: window.devicePixelRatio || 1,
-      };
-
-      console.group('🧪 [Test PDF Export] DOM & Device Diagnostics');
-      console.log('User Agent:', navigator.userAgent);
-      console.log('Platform:', navigator.platform);
-      console.log('Device Type:', deviceType);
-      console.log('Screen Metrics:', `${screenDim.w}x${screenDim.h} (DPR: ${screenDim.dpr})`);
-      console.table({
-        'Device': deviceType,
-        'Screen Width': `${screenDim.w}px`,
-        'Screen Height': `${screenDim.h}px`,
-        'Device Pixel Ratio': screenDim.dpr,
-        'DOM Page Width (offsetWidth)': `${domDim.offsetW}px`,
-        'DOM Page Height (offsetHeight)': `${domDim.offsetH}px`,
-        'DOM Client Width': `${domDim.clientW}px`,
-        'DOM Client Height': `${domDim.clientH}px`,
-        'BoundingRect Width': `${domDim.rectW}px`,
-        'BoundingRect Height': `${domDim.rectH}px`,
-      });
-      console.groupEnd();
-
-      const startTime = performance.now();
-      const testScale = 1.2; // smaller-scale rendering first to verify device compatibility
-
-      const canvas = await renderIsolatedPageCanvas(targetElem, 0, testScale);
-
-      const durationMs = Math.round(performance.now() - startTime);
-      const canvasDim = { w: canvas.width, h: canvas.height };
-
-      console.log(`🧪 [Test PDF Export] Canvas rendered successfully in ${durationMs}ms:`, canvasDim);
-
-      // Attempt 1-page test PDF creation
-      const testPdf = new jsPDF({
-        orientation: 'p',
-        unit: 'mm',
-        format: 'a4',
-        compress: true,
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.85);
-      testPdf.addImage(imgData, 'JPEG', 0, 0, 210, 297, undefined, 'FAST');
-      const testBlob = testPdf.output('blob');
-      const testBlobUrl = URL.createObjectURL(testBlob);
-      const blobSizeKb = Math.round(testBlob.size / 1024);
-
-      // Clean up canvas memory immediately
-      canvas.width = 0;
-      canvas.height = 0;
-
-      setDiagnosticData({
-        deviceType,
-        osInfo: navigator.userAgent.includes('iPhone') ? 'iOS iPhone' : navigator.userAgent.includes('iPad') ? 'iPadOS Tablet' : navigator.userAgent.includes('Android') ? 'Android Mobile' : 'Desktop Browser',
-        userAgent: navigator.userAgent,
-        screenDim,
-        domDim,
-        targetScale: testScale,
-        renderSuccess: true,
-        durationMs,
-        canvasDim,
-        blobSizeKb,
-        thumbnailUrl: imgData,
-        testBlobUrl,
-      });
-
-    } catch (err: any) {
-      console.error('🧪 [Test PDF Export] Error:', err);
-      const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-      const isAndroid = typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent);
-      
-      setDiagnosticData({
-        deviceType: isIOS ? 'iPhone' : isAndroid ? 'Android' : 'Desktop',
-        osInfo: navigator.userAgent,
-        userAgent: navigator.userAgent,
-        screenDim: { w: window.innerWidth, h: window.innerHeight, dpr: window.devicePixelRatio || 1 },
-        domDim: { offsetW: 0, offsetH: 0, clientW: 0, clientH: 0, rectW: 0, rectH: 0 },
-        targetScale: 1.2,
-        renderSuccess: false,
-        durationMs: 0,
-        errorMessage: err.message || 'Terjadi kesalahan saat uji render',
-      });
-    } finally {
-      setIsTestingPdf(false);
+  // Handler untuk membuka modal AI Summarizer & inisialisasi rangkuman
+  const handleOpenAiSummarizer = () => {
+    setIsAiModalOpen(true);
+    if (!aiSummaryResult) {
+      handleRunAiSummarize();
     }
+  };
+
+  const handleRunAiSummarize = async () => {
+    setIsSummarizingAi(true);
+    try {
+      const res = await summarizeReport(filteredEntries, reportConfig);
+      setAiSummaryResult(res);
+    } catch (err: any) {
+      console.error('AI summarize error:', err);
+      alert('Gagal memproses rangkuman AI: ' + (err.message || 'Terjadi kesalahan sistem'));
+    } finally {
+      setIsSummarizingAi(false);
+    }
+  };
+
+  const handleApplyAiSummary = (customRes?: AiSummarizeResult) => {
+    const res = customRes || aiSummaryResult;
+    if (!res || res.months.length === 0) {
+      alert('Tidak ada data rangkuman yang dapat diterapkan. Pastikan ada entri logbook pada periode ini.');
+      return;
+    }
+
+    const rows: Table1RowItem[] = res.months.map((m) => ({
+      label: m.monthName,
+      items: m.categories.map((c) => `${c.categoryTitle} : ${c.summary}`),
+      keterangan: m.keterangan || 'WFO / Kedinasan',
+    }));
+
+    setCustomTable1(rows);
+    setHasCustomEdits(true);
+    setIsUsingAiSummary(true);
+    setIsAiModalOpen(false);
+    displayPhotoToast('Rangkuman Kategori Kedinasan (AI) berhasil diterapkan ke Tabel 1 Laporan!');
+  };
+
+  const handleRestoreDailyRows = () => {
+    setCustomTable1(defaultTable1Data);
+    setIsUsingAiSummary(false);
+    setHasCustomEdits(false);
+    displayPhotoToast(
+      reportConfig.tipe === 'bulanan'
+        ? 'Tabel 1 dikembalikan ke susunan rincian harian logbook.'
+        : 'Tabel 1 dikembalikan ke susunan rangkuman bulanan standar.'
+    );
   };
 
   // DIRECT WORD DOCX EXPORT
@@ -1169,13 +1130,13 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
             </button>
 
             <button
-              onClick={handleTestPdfExport}
-              disabled={isTestingPdf || isGeneratingPdf}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold shadow-md transition-colors disabled:opacity-50 border border-purple-500/30 cursor-pointer"
-              title="Uji render DOM dan deteksi kompatibilitas canvas PDF di perangkat Anda (iPhone/Android)"
+              onClick={handleOpenAiSummarizer}
+              disabled={isGeneratingPdf || isExportingDocx || isSummarizingAi}
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-gradient-to-r from-purple-700 via-indigo-700 to-purple-800 hover:from-purple-600 hover:to-indigo-600 text-white text-xs font-bold shadow-md transition-all border border-purple-400/40 cursor-pointer active:scale-95"
+              title="Rangkuman AI: Rangkum kegiatan Triwulan & Tahunan secara otomatis ke format kategori kedinasan resmi Kementerian Pertanian"
             >
-              <FlaskConical className={`w-3.5 h-3.5 ${isTestingPdf ? 'animate-spin' : 'text-purple-300'}`} />
-              <span>{isTestingPdf ? 'Menguji...' : 'Uji Render'}</span>
+              <Sparkles className={`w-3.5 h-3.5 ${isSummarizingAi ? 'animate-spin text-amber-200' : 'text-amber-300'}`} />
+              <span>{isSummarizingAi ? 'Merangkum...' : 'Rangkuman AI'}</span>
             </button>
 
             <button
@@ -1573,7 +1534,7 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                         <tr style={{ backgroundColor: '#f1f5f9', borderBottom: '1px solid #000000' }} className="font-bold text-[10.5pt]">
                           <th style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', width: '8%', boxSizing: 'border-box' }}>No.</th>
                           <th style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', width: '22%', boxSizing: 'border-box' }}>
-                            Tanggal
+                            {reportConfig.tipe === 'bulanan' ? 'Tanggal' : 'Bulan'}
                           </th>
                           <th style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', width: '54%', boxSizing: 'border-box' }}>
                             Rincian Pekerjaan
@@ -1620,12 +1581,29 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                                     className="w-full p-1.5 border border-amber-300 rounded text-xs leading-relaxed font-sans"
                                   />
                                 ) : (
-                                  row.items.map((it, itemIdx) => (
-                                    <div key={itemIdx} className="leading-snug">
-                                      <span className="font-semibold">• </span>
-                                      <span>{it}</span>
-                                    </div>
-                                  ))
+                                  row.items.map((it, itemIdx) => {
+                                    const colonIdx = it.indexOf(':');
+                                    if (colonIdx > 0 && colonIdx < 50) {
+                                      let catTitle = it.substring(0, colonIdx).trim();
+                                      if (catTitle.startsWith('•')) {
+                                        catTitle = catTitle.substring(1).trim();
+                                      }
+                                      const descText = it.substring(colonIdx + 1).trim();
+                                      return (
+                                        <div key={itemIdx} className="leading-snug mb-1 text-left">
+                                          <span className="font-bold">• {catTitle}</span>
+                                          <span className="font-semibold"> : </span>
+                                          <span>{descText}</span>
+                                        </div>
+                                      );
+                                    }
+                                    return (
+                                      <div key={itemIdx} className="leading-snug text-left">
+                                        <span className="font-semibold">• </span>
+                                        <span>{it}</span>
+                                      </div>
+                                    );
+                                  })
                                 )}
                               </td>
                               <td style={{ border: '1px solid #000000', padding: '5px 8px', textAlign: 'center', fontSize: '10.5pt', wordBreak: 'break-word', boxSizing: 'border-box' }} className="text-stone-700">
@@ -1998,134 +1976,216 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
         </div>
       </div>
 
-      {/* ==================== MODAL 1: UJI RENDER PDF DIAGNOSTIK ==================== */}
-      {diagnosticData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/80 backdrop-blur-sm animate-fade-in no-print">
-          <div className="bg-stone-900 border border-stone-700/80 rounded-2xl shadow-2xl max-w-lg w-full p-5 text-white space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between border-b border-stone-800 pb-3">
-              <div className="flex items-center gap-2">
-                <FlaskConical className="w-5 h-5 text-purple-400" />
-                <h3 className="text-base font-bold text-white">Hasil Uji Render PDF (Diagnostik)</h3>
+      {/* ==================== MODAL 1: RANGKUMAN KINERJA KEDINASAN OTOMATIS (AI) ==================== */}
+      {isAiModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-stone-950/85 backdrop-blur-sm animate-fade-in no-print overflow-y-auto">
+          <div className="bg-stone-900 border border-purple-500/40 rounded-2xl shadow-2xl max-w-2xl w-full p-5 sm:p-6 text-white space-y-4 max-h-[92vh] overflow-y-auto my-auto">
+            {/* Modal Header */}
+            <div className="flex items-start justify-between border-b border-stone-800 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-purple-600 to-indigo-700 text-amber-300 shadow-md">
+                  <Sparkles className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                    Rangkuman Kinerja Kedinasan Otomatis (AI)
+                  </h3>
+                  <p className="text-xs text-purple-200/80">
+                    Standardisasi 9 Kategori Kedinasan PVTPP Kementerian Pertanian
+                  </p>
+                </div>
               </div>
               <button
                 type="button"
-                onClick={() => setDiagnosticData(null)}
+                onClick={() => setIsAiModalOpen(false)}
                 className="p-1.5 text-stone-400 hover:text-white hover:bg-stone-800 rounded-lg transition-colors cursor-pointer"
               >
-                <X className="w-4 h-4" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Status Summary Banner */}
-            {diagnosticData.renderSuccess ? (
-              <div className="bg-emerald-950/70 border border-emerald-500/50 p-3.5 rounded-xl flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0 mt-0.5" />
-                <div className="text-xs space-y-1">
-                  <p className="font-bold text-emerald-300">Uji Render DOM Berhasil!</p>
-                  <p className="text-stone-300 leading-relaxed">
-                    Browser Anda berhasil mengonversi DOM laporan menjadi canvas dan file PDF tanpa error OKLCH. Mesin rendering kompatibel.
+            {/* Target Period & Context Notice */}
+            <div className="bg-stone-950/70 border border-stone-800 rounded-xl p-3.5 space-y-2 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-stone-400">Target Laporan:</span>
+                  <span className="px-2 py-0.5 rounded font-bold bg-purple-950 text-purple-300 border border-purple-700/50 uppercase">
+                    {reportConfig.tipe} &bull; {reportConfig.tipe === 'triwulan' ? `Triwulan ${reportConfig.triwulan}` : reportConfig.tipe === 'tahunan' ? 'Tahunan' : MONTH_NAMES[reportConfig.bulan - 1]} {reportConfig.tahun}
+                  </span>
+                </div>
+                <span className="text-stone-400">
+                  Data Sumber: <strong className="text-white">{filteredEntries.length} kegiatan</strong>
+                </span>
+              </div>
+
+              {reportConfig.tipe === 'bulanan' ? (
+                <div className="bg-amber-950/40 border border-amber-600/40 rounded-lg p-2.5 text-amber-200 text-xs space-y-1.5">
+                  <div className="flex items-center gap-1.5 font-bold text-amber-300">
+                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                    <span>Rekomendasi Kategori Laporan:</span>
+                  </div>
+                  <p className="leading-relaxed text-[11px] text-amber-200/90">
+                    Fitur Rangkuman AI sangat direkomendasikan untuk laporan <strong>Triwulan</strong> dan <strong>Tahunan</strong> untuk menyatukan kegiatan sejenis per bulan agar tidak panjang berulang. Anda juga dapat beralih sekarang:
                   </p>
+                  <div className="flex items-center gap-2 pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReportConfig((prev) => ({ ...prev, tipe: 'triwulan' }));
+                        setAiSummaryResult(null);
+                        setTimeout(() => handleRunAiSummarize(), 50);
+                      }}
+                      className="px-2.5 py-1 rounded bg-purple-700 hover:bg-purple-600 text-white font-bold text-[11px] transition-colors cursor-pointer"
+                    >
+                      Beralih ke Triwulan {reportConfig.triwulan}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setReportConfig((prev) => ({ ...prev, tipe: 'tahunan' }));
+                        setAiSummaryResult(null);
+                        setTimeout(() => handleRunAiSummarize(), 50);
+                      }}
+                      className="px-2.5 py-1 rounded bg-indigo-700 hover:bg-indigo-600 text-white font-bold text-[11px] transition-colors cursor-pointer"
+                    >
+                      Beralih ke Tahunan
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-[11px] text-stone-300 leading-relaxed">
+                  AI mengelompokkan kegiatan harian per bulan ke dalam 9 kategori kedinasan resmi, menyatukan uraian kerja yang sama (pengolahan lahan, persiapan tanam, pemeliharaan, sanitasi, dll.), dan memformat judul bertanda (•) tebal.
+                </p>
+              )}
+            </div>
+
+            {/* AI Generation State or Results Preview */}
+            {isSummarizingAi ? (
+              <div className="py-10 text-center space-y-3 bg-stone-950/50 rounded-xl border border-stone-800 p-6">
+                <div className="inline-flex items-center justify-center p-3 rounded-full bg-purple-900/50 text-amber-300 border border-purple-500/40 animate-pulse">
+                  <Sparkles className="w-8 h-8 animate-spin" />
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold text-white">
+                    Memproses Rangkuman Kegiatan dengan AI...
+                  </p>
+                  <p className="text-xs text-stone-400 max-w-md mx-auto">
+                    Menganalisis {filteredEntries.length} uraian kegiatan, menyatukan pekerjaan sejenis, dan memetakan ke dalam 9 kategori standar kedinasan.
+                  </p>
+                </div>
+              </div>
+            ) : aiSummaryResult && aiSummaryResult.months.length > 0 ? (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between text-xs text-stone-300">
+                  <span className="font-bold text-emerald-400 flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    Hasil Rangkuman Siap Diterapkan ({aiSummaryResult.months.length} Bulan):
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleRunAiSummarize}
+                    className="text-[11px] text-purple-300 hover:text-white flex items-center gap-1 hover:underline cursor-pointer"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                    <span>Rangkum Ulang</span>
+                  </button>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto space-y-2.5 pr-1">
+                  {aiSummaryResult.months.map((m, mIdx) => (
+                    <div
+                      key={mIdx}
+                      className="bg-stone-950/80 border border-stone-800 rounded-xl p-3.5 space-y-2 text-xs"
+                    >
+                      <div className="flex items-center justify-between border-b border-stone-800/80 pb-1.5">
+                        <span className="font-bold text-white text-sm">
+                          Bulan {m.monthName}
+                        </span>
+                        <span className="text-[10px] bg-stone-800 text-stone-300 px-2 py-0.5 rounded-full font-mono">
+                          {m.categories.length} Kategori Aktif
+                        </span>
+                      </div>
+
+                      <div className="space-y-1.5 text-stone-200">
+                        {m.categories.map((c, cIdx) => (
+                          <div key={cIdx} className="leading-relaxed pl-2 border-l-2 border-purple-500/40">
+                            <span className="font-bold text-white">• {c.categoryTitle}</span>
+                            <span className="font-semibold text-stone-300"> : </span>
+                            <span className="text-stone-300">{c.summary}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
             ) : (
-              <div className="bg-red-950/70 border border-red-500/50 p-3.5 rounded-xl flex items-start gap-3">
-                <AlertCircle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-                <div className="text-xs space-y-1">
-                  <p className="font-bold text-red-300">Uji Render Menemukan Kendala</p>
-                  <p className="text-stone-300 leading-relaxed break-words">
-                    {diagnosticData.errorMessage || 'Terjadi kesalahan sistem saat pengujian.'}
-                  </p>
-                </div>
+              <div className="py-8 text-center space-y-3 bg-stone-950/50 rounded-xl border border-stone-800 p-4">
+                <p className="text-xs text-stone-400">
+                  Belum ada rangkuman yang dihasilkan untuk periode ini.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleRunAiSummarize}
+                  className="px-4 py-2 rounded-xl bg-purple-700 hover:bg-purple-600 text-white text-xs font-bold shadow-md transition-colors inline-flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300" />
+                  <span>Mulai Rangkuman AI</span>
+                </button>
               </div>
             )}
 
-            {/* Diagnostic Metrics Table */}
-            <div className="bg-stone-950/70 border border-stone-800 rounded-xl p-3.5 space-y-2 text-xs">
-              <div className="font-bold text-stone-300 uppercase tracking-wider text-[10px] pb-1 border-b border-stone-800">
-                Informasi Perangkat & Metrik DOM
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 text-stone-300">
-                <div>
-                  <span className="text-stone-400 block text-[11px]">Tipe Perangkat:</span>
-                  <span className="font-semibold text-white">{diagnosticData.deviceType} ({diagnosticData.osInfo})</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 block text-[11px]">Resolusi Layar (DPR):</span>
-                  <span className="font-semibold text-white">{diagnosticData.screenDim.w} x {diagnosticData.screenDim.h} px ({diagnosticData.screenDim.dpr}x)</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 block text-[11px]">Dimensi DOM Halaman 1:</span>
-                  <span className="font-semibold text-white">{diagnosticData.domDim.offsetW} x {diagnosticData.domDim.offsetH} px</span>
-                </div>
-                <div>
-                  <span className="text-stone-400 block text-[11px]">Skala Uji (Render Scale):</span>
-                  <span className="font-semibold text-white">{diagnosticData.targetScale}x</span>
-                </div>
-                {diagnosticData.renderSuccess && (
-                  <>
-                    <div>
-                      <span className="text-stone-400 block text-[11px]">Ukuran Canvas Hasil:</span>
-                      <span className="font-semibold text-emerald-400">{diagnosticData.canvasDim?.w} x {diagnosticData.canvasDim?.h} px</span>
-                    </div>
-                    <div>
-                      <span className="text-stone-400 block text-[11px]">Waktu Render / Ukuran:</span>
-                      <span className="font-semibold text-emerald-400">{diagnosticData.durationMs} ms ({diagnosticData.blobSizeKb} KB)</span>
-                    </div>
-                  </>
-                )}
+            {/* 9 Reference Categories Collapsible Info */}
+            <div className="bg-stone-950/40 border border-stone-800/80 rounded-xl p-3 text-[11px] text-stone-400 space-y-1.5">
+              <span className="font-bold text-stone-300 uppercase tracking-wider text-[10px] block">
+                9 Kategori Resmi Kedinasan:
+              </span>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-[11px] text-stone-300">
+                <div>• <strong className="text-white">pengolahan lahan</strong> : olah lahan, bedengan, cangkul, traktor</div>
+                <div>• <strong className="text-white">persiapan tanam</strong> : semai, lubang tanam, bibit, mulsa</div>
+                <div>• <strong className="text-white">penanaman</strong> : penanaman bibit/benih sayuran</div>
+                <div>• <strong className="text-white">pemeliharaan tanaman</strong> : siram, semprot, pupuk, wiwit</div>
+                <div>• <strong className="text-white">sanitasi lahan</strong> : penyiangan gulma, babad rumput</div>
+                <div>• <strong className="text-white">Panen</strong> : pemanenan sayuran, sortasi, timbang</div>
+                <div>• <strong className="text-white">kegiatan kedinasan</strong> : upacara peringatan hari kenegaraan</div>
+                <div>• <strong className="text-white">pemeliharaan sarpras</strong> : servis mesin babad, traktor, pompa</div>
+                <div className="sm:col-span-2">• <strong className="text-white">kegiatan lainnya</strong> : pendukung operasional kantor atau kebun</div>
               </div>
             </div>
 
-            {/* Live Thumbnail Preview */}
-            {diagnosticData.thumbnailUrl && (
-              <div className="space-y-1.5">
-                <span className="text-[11px] font-semibold text-stone-300 block">
-                  Pratinjau Hasil Render (Halaman 1):
-                </span>
-                <div className="bg-stone-950 p-2 rounded-xl border border-stone-800 flex justify-center max-h-48 overflow-hidden">
-                  <img
-                    src={diagnosticData.thumbnailUrl}
-                    alt="Pratinjau Uji Render"
-                    className="max-h-44 object-contain rounded border border-stone-700 shadow-md"
-                  />
-                </div>
-              </div>
-            )}
-
             {/* Modal Actions */}
-            <div className="flex flex-wrap items-center justify-end gap-2 pt-2 border-t border-stone-800">
-              {diagnosticData.testBlobUrl && (
-                <a
-                  href={diagnosticData.testBlobUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold transition-colors cursor-pointer border border-stone-600"
-                >
-                  <ExternalLink className="w-3.5 h-3.5" />
-                  <span>Buka PDF Hasil Uji</span>
-                </a>
-              )}
-              {diagnosticData.renderSuccess && (
+            <div className="flex flex-wrap items-center justify-between gap-2 pt-3 border-t border-stone-800">
+              {isUsingAiSummary && (
                 <button
                   type="button"
-                  onClick={() => {
-                    setDiagnosticData(null);
-                    handleDownloadPdf();
-                  }}
-                  className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-colors cursor-pointer"
+                  onClick={handleRestoreDailyRows}
+                  className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-medium transition-colors cursor-pointer flex items-center gap-1.5"
                 >
-                  <FileText className="w-3.5 h-3.5" />
-                  <span>Unduh Dokumen Lengkap</span>
+                  <RotateCcw className="w-3.5 h-3.5 text-stone-400" />
+                  <span>Kembalikan ke Rincian Harian</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={() => setDiagnosticData(null)}
-                className="px-3 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-medium transition-colors cursor-pointer"
-              >
-                Tutup
-              </button>
+
+              <div className="flex items-center gap-2 ml-auto">
+                <button
+                  type="button"
+                  onClick={() => setIsAiModalOpen(false)}
+                  className="px-4 py-2 rounded-lg bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-medium transition-colors cursor-pointer"
+                >
+                  Tutup
+                </button>
+
+                {aiSummaryResult && aiSummaryResult.months.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => handleApplyAiSummary()}
+                    className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold shadow-md transition-all cursor-pointer active:scale-95"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>Terapkan ke Laporan Resmi (Tabel 1)</span>
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -2160,16 +2220,15 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
               {/* Direct Open in New Tab - 100% reliable on Safari & Chrome */}
-              <button
-                type="button"
-                onClick={() => {
-                  window.open(readyPdfInfo.url, '_blank');
-                }}
-                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer"
+              <a
+                href={readyPdfInfo.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-md transition-all cursor-pointer text-center"
               >
                 <ExternalLink className="w-4 h-4" />
-                <span>Buka / Lihat PDF</span>
-              </button>
+                <span>Buka / Unduh PDF</span>
+              </a>
 
               {/* Native Mobile Share Sheet (Files / WhatsApp / Drive) triggered by direct tap */}
               <button
@@ -2195,7 +2254,10 @@ export const OfficialReportView: React.FC<OfficialReportViewProps> = ({ entries,
                     }
                   } catch (err: any) {
                     if (err.name !== 'AbortError') {
-                      window.open(readyPdfInfo.url, '_blank');
+                      const link = document.createElement('a');
+                      link.href = readyPdfInfo.url;
+                      link.download = readyPdfInfo.filename;
+                      link.click();
                     }
                   }
                 }}

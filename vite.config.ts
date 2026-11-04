@@ -19,19 +19,25 @@ export default defineConfig(() => {
           'logo_kementan.svg',
           'pwa-192x192.png',
           'pwa-512x512.png',
-          'pwa-maskable-512x512.png'
+          'pwa-maskable-512x512.png',
+          'screenshot-mobile.png',
+          'screenshot-desktop.png'
         ],
         manifest: {
           id: '/',
           name: 'Logbook Kinerja Kps 1 manoko',
           short_name: 'LogbookKPS',
-          description: 'Aplikasi Logbook Kinerja Harian dan Pembuatan Laporan Resmi Operasional Kantor KPS PVT 1 Manoko',
+          description: 'Aplikasi Resmi Logbook Kinerja Harian dan Laporan Operasional Kantor KPS PVT 1 Manoko - PVTPP Kementerian Pertanian',
+          lang: 'id',
+          dir: 'ltr',
           theme_color: '#021a12',
           background_color: '#021a12',
           display: 'standalone',
+          display_override: ['window-controls-overlay', 'standalone', 'minimal-ui'],
           orientation: 'portrait-primary',
           start_url: '/',
           scope: '/',
+          prefer_related_applications: false,
           categories: ['productivity', 'business', 'government'],
           icons: [
             {
@@ -52,6 +58,22 @@ export default defineConfig(() => {
               type: 'image/png',
               purpose: 'maskable',
             },
+          ],
+          screenshots: [
+            {
+              src: '/screenshot-mobile.png',
+              sizes: '750x1334',
+              type: 'image/png',
+              form_factor: 'narrow',
+              label: 'Formulir Pencatatan Logbook Kinerja Harian KPS 1 Manoko'
+            },
+            {
+              src: '/screenshot-desktop.png',
+              sizes: '1280x720',
+              type: 'image/png',
+              form_factor: 'wide',
+              label: 'Rekap Kinerja dan Pembuatan Laporan Resmi KPS 1 Manoko'
+            }
           ],
           shortcuts: [
             {

@@ -22,6 +22,7 @@ import {
   parseTimeScore, 
   normalizeLogbookEntry 
 } from './storage';
+import { generateLocalReportSummary } from './aiReportSummarizer';
 
 const MONTH_NAMES = [
   'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
@@ -353,36 +354,48 @@ export async function exportReportToDocx(
   if (customData?.table1Groups && customData.table1Groups.length > 0) {
     table1Groups = customData.table1Groups;
   } else {
-    filtered.forEach((e) => {
-      const pd = parseDateDetails(e.tanggal);
-      const dateStr =
-        config.tipe === 'tahunan'
-          ? `${pd.day} ${MONTH_NAMES[pd.month - 1]} ${pd.year}`
-          : `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
+    if (config.tipe === 'bulanan') {
+      filtered.forEach((e) => {
+        const pd = parseDateDetails(e.tanggal);
+        const dateStr = `${pd.day} ${MONTH_NAMES[pd.month - 1]}`;
 
-      let itemDesc = '';
-      if (e.kehadiran === 'Sakit') {
-        itemDesc = `Izin Sakit: ${cleanDocxText(e.keterangan || 'Istirahat Sakit')}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
-      } else if (e.kehadiran === 'Cuti') {
-        itemDesc = `Cuti: ${cleanDocxText(e.keterangan || 'Cuti Resmi')}`;
-      } else {
-        let desc = cleanDocxText(e.uraianPekerjaan);
-        const locDetails: string[] = [];
-        if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${cleanDocxText(e.lokasiPekerjaan)}`);
-        if (e.luasLahan && e.luasLahan !== '-') locDetails.push(`Luas: ${cleanDocxText(formatAreaUnit(e.luasLahan))}`);
-        if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${cleanDocxText(e.keterangan)}`);
-        if (locDetails.length > 0) {
-          desc += ` (${locDetails.join(', ')})`;
+        let itemDesc = '';
+        if (e.kehadiran === 'Sakit') {
+          itemDesc = `Izin Sakit: ${cleanDocxText(e.keterangan || 'Istirahat Sakit')}${e.suratSakit ? ' (Surat Dokter Terlampir)' : ''}`;
+        } else if (e.kehadiran === 'Cuti') {
+          itemDesc = `Cuti: ${cleanDocxText(e.keterangan || 'Cuti Resmi')}`;
+        } else {
+          let desc = cleanDocxText(e.uraianPekerjaan);
+          const locDetails: string[] = [];
+          if (e.lokasiPekerjaan && e.lokasiPekerjaan !== '-') locDetails.push(`Lokasi: ${cleanDocxText(e.lokasiPekerjaan)}`);
+          if (e.luasLahan && e.luasLahan !== '-') locDetails.push(`Luas: ${cleanDocxText(formatAreaUnit(e.luasLahan))}`);
+          if (e.keterangan && e.keterangan !== '-') locDetails.push(`Ket: ${cleanDocxText(e.keterangan)}`);
+          if (locDetails.length > 0) {
+            desc += ` (${locDetails.join(', ')})`;
+          }
+          itemDesc = desc;
         }
-        itemDesc = desc;
-      }
 
-      table1Groups.push({
-        label: dateStr,
-        items: [itemDesc],
-        keterangan: cleanDocxText(e.kehadiran || 'WFO'),
+        table1Groups.push({
+          label: dateStr,
+          items: [itemDesc],
+          keterangan: cleanDocxText(e.kehadiran || 'WFO'),
+        });
       });
-    });
+    } else {
+      // Triwulan or Tahunan: Otomatis hasilkan format rangkuman bulanan
+      const summary = generateLocalReportSummary(filtered, config);
+      table1Groups = summary.months.map((m) => {
+        const items = m.categories.length > 0
+          ? m.categories.map((c) => `${cleanDocxText(c.categoryTitle)} : ${cleanDocxText(c.summary)}`)
+          : ['Tidak ada catatan kegiatan operasional pada bulan ini'];
+        return {
+          label: m.monthName,
+          items,
+          keterangan: m.categories.length > 0 ? cleanDocxText(m.keterangan || 'WFO / Kedinasan') : '-',
+        };
+      });
+    }
   }
 
   // Pre-load rasterized images for Table 2 (Dokumentasi Kegiatan)
@@ -436,7 +449,7 @@ export async function exportReportToDocx(
               alignment: AlignmentType.CENTER,
               children: [
                 new TextRun({
-                  text: 'Tanggal',
+                  text: config.tipe === 'bulanan' ? 'Tanggal' : 'Bulan',
                   bold: true,
                 }),
               ],
@@ -456,16 +469,34 @@ export async function exportReportToDocx(
   ];
 
   table1Groups.forEach((group, index) => {
-    const itemParagraphs = group.items.map(
-      (item) =>
-        new Paragraph({
+    const itemParagraphs = group.items.map((item) => {
+      // Check if item contains "judul : isi" (e.g. "pengolahan lahan : ...")
+      const colonIdx = item.indexOf(':');
+      if (colonIdx > 0 && colonIdx < 50) {
+        let catTitle = item.substring(0, colonIdx).trim();
+        if (catTitle.startsWith('•')) {
+          catTitle = catTitle.substring(1).trim();
+        }
+        const descText = item.substring(colonIdx + 1).trim();
+        return new Paragraph({
           children: [
             new TextRun({ text: '• ', bold: true }),
-            new TextRun({ text: cleanDocxText(item) }),
+            new TextRun({ text: cleanDocxText(catTitle), bold: true }),
+            new TextRun({ text: ' : ' }),
+            new TextRun({ text: cleanDocxText(descText) }),
           ],
           spacing: { after: 100 },
-        })
-    );
+        });
+      }
+
+      return new Paragraph({
+        children: [
+          new TextRun({ text: '• ', bold: true }),
+          new TextRun({ text: cleanDocxText(item) }),
+        ],
+        spacing: { after: 100 },
+      });
+    });
 
     table1DocRows.push(
       new TableRow({

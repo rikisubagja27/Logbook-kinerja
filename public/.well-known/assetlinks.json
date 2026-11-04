@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "id.go.pertanian.kpsmanoko.logbook",
+      "sha256_cert_fingerprints": [
+        "14:6D:E9:01:F8:85:7E:02:CE:71:0D:37:A6:49:FF:83:B3:0A:79:DF:99:99:D1:6C:C5:37:22:98:C7:E2:BF:E5"
+      ]
+    }
+  }
+]

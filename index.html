@@ -21,6 +21,74 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400;1,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script>
+      // 1. Intercept Vite HMR WebSocket connection per AI Studio constraint (HMR: Disabled)
+      try {
+        const _RealWS = window.WebSocket;
+        if (_RealWS) {
+          window.WebSocket = function(url, protocols) {
+            if (protocols === 'vite-hmr' || (typeof url === 'string' && (url.includes('token=') || url.includes('/@vite/')))) {
+              var listeners = {};
+              var fakeWs = {
+                OPEN: 1,
+                CLOSED: 3,
+                readyState: 1,
+                addEventListener: function(type, fn) {
+                  if (!listeners[type]) listeners[type] = [];
+                  listeners[type].push(fn);
+                  if (type === 'open') {
+                    setTimeout(function() {
+                      try { fn({ type: 'open' }); } catch (err) {}
+                    }, 0);
+                  }
+                },
+                removeEventListener: function(type, fn) {
+                  if (listeners[type]) {
+                    listeners[type] = listeners[type].filter(function(f) { return f !== fn; });
+                  }
+                },
+                send: function() {},
+                close: function() {
+                  fakeWs.readyState = 3;
+                }
+              };
+              return fakeWs;
+            }
+            return new _RealWS(url, protocols);
+          };
+          window.WebSocket.prototype = _RealWS.prototype;
+        }
+      } catch (e) {}
+
+      // 2. Suppress [vite] console.error and error events
+      try {
+        const _origConsoleError = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          if (typeof args[0] === 'string' && args[0].indexOf('[vite]') !== -1) {
+            return;
+          }
+          return _origConsoleError.apply(console, args);
+        };
+      } catch (e) {}
+
+      window.addEventListener('error', function(event) {
+        if ((event.filename && event.filename.indexOf('@vite/client') !== -1) ||
+            (event.message && (event.message.indexOf('WebSocket') !== -1 || event.message.indexOf('[vite]') !== -1))) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+          return true;
+        }
+      }, true);
+
+      window.addEventListener('unhandledrejection', function(event) {
+        var str = String(event.reason || '');
+        if (str.indexOf('WebSocket') !== -1 || str.indexOf('[vite]') !== -1) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+    </script>
   </head>
   <body class="bg-[#1c1917] text-stone-100 antialiased font-sans selection:bg-emerald-400 selection:text-stone-950">
     <div id="root"></div>
