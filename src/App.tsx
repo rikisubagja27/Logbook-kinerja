@@ -516,6 +516,7 @@ export default function App() {
             onCancelEdit={() => setEditingEntry(null)}
             editingEntry={editingEntry}
             onNavigateToReport={() => setActiveTab('report')}
+            onNavigateToList={() => setActiveTab('list')}
           />
         )}
 
@@ -531,6 +532,7 @@ export default function App() {
             onImportBackup={handleImportBackup}
             onRecoverPhotos={handleRecoverPhotos}
             onSortEntries={handleSortAndSyncEntries}
+            onNavigateToReport={() => setActiveTab('report')}
           />
         )}
 

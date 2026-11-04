@@ -28,6 +28,7 @@ interface LogbookFormProps {
   onCancelEdit?: () => void;
   editingEntry?: LogbookEntry | null;
   onNavigateToReport?: () => void;
+  onNavigateToList?: () => void;
 }
 
 const COMMON_LOCATIONS = [
@@ -49,6 +50,7 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
   onCancelEdit,
   editingEntry,
   onNavigateToReport,
+  onNavigateToList,
 }) => {
   // Direct file input refs for 100% reliable click triggering
   const fileInputSebelumRef = useRef<HTMLInputElement | null>(null);
@@ -440,16 +442,28 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
               </p>
             </div>
           </div>
-          {onNavigateToReport && (
-            <button
-              type="button"
-              onClick={onNavigateToReport}
-              className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-4 py-2 rounded-xl transition-all cursor-pointer shrink-0 shadow-md hover:shadow-lg flex items-center gap-1.5"
-            >
-              <span>Buka Laporan Resmi</span>
-              <span>→</span>
-            </button>
-          )}
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {onNavigateToList && (
+              <button
+                type="button"
+                onClick={onNavigateToList}
+                className="text-xs bg-stone-900 hover:bg-stone-800 text-stone-200 font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer shrink-0 border border-stone-600 flex items-center gap-1.5 shadow-xs"
+              >
+                <span>Lihat di Rekap Logbook</span>
+                <span>→</span>
+              </button>
+            )}
+            {onNavigateToReport && (
+              <button
+                type="button"
+                onClick={onNavigateToReport}
+                className="text-xs bg-emerald-600 hover:bg-emerald-500 text-white font-semibold px-3.5 py-2 rounded-xl transition-all cursor-pointer shrink-0 shadow-md hover:shadow-lg flex items-center gap-1.5"
+              >
+                <span>Buka Laporan Resmi</span>
+                <span>→</span>
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -463,14 +477,24 @@ export const LogbookForm: React.FC<LogbookFormProps> = ({
               Data otomatis tersinkronisasi & form telah dikosongkan.
             </p>
           </div>
-          {onNavigateToReport && (
-            <button
-              onClick={onNavigateToReport}
-              className="ml-3 text-xs bg-emerald-700 hover:bg-emerald-600 px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer"
-            >
-              Lihat Laporan
-            </button>
-          )}
+          <div className="flex items-center gap-1.5 ml-2">
+            {onNavigateToList && (
+              <button
+                onClick={onNavigateToList}
+                className="text-xs bg-emerald-800 hover:bg-emerald-700 px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer text-stone-200"
+              >
+                Rekap Logbook
+              </button>
+            )}
+            {onNavigateToReport && (
+              <button
+                onClick={onNavigateToReport}
+                className="text-xs bg-emerald-700 hover:bg-emerald-600 px-2.5 py-1.5 rounded-lg font-medium transition-colors cursor-pointer text-white"
+              >
+                Laporan
+              </button>
+            )}
+          </div>
         </div>
       )}
 

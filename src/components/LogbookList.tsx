@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { LogbookEntry, AttendanceStatus } from '../types/logbook';
 import { parseDateScore, parseTimeScore, parseDateDetails, normalizeLogbookEntry } from '../utils/storage';
 import { 
@@ -19,8 +19,16 @@ import {
   RotateCcw,
   CheckCircle2,
   Camera,
-  ArrowUpDown
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Layers
 } from 'lucide-react';
+
+const MONTH_NAMES = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
 
 interface LogbookListProps {
   entries: LogbookEntry[];
@@ -30,6 +38,7 @@ interface LogbookListProps {
   onImportBackup: (imported: LogbookEntry[]) => void;
   onRecoverPhotos?: () => { count: number; dates: string[] };
   onSortEntries?: (sorted: LogbookEntry[]) => void;
+  onNavigateToReport?: () => void;
 }
 
 export const LogbookList: React.FC<LogbookListProps> = ({
@@ -40,11 +49,13 @@ export const LogbookList: React.FC<LogbookListProps> = ({
   onImportBackup,
   onRecoverPhotos,
   onSortEntries,
+  onNavigateToReport,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterMonth, setFilterMonth] = useState<string>('all');
   const [filterAttendance, setFilterAttendance] = useState<string>('all');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc'); // Default: Tanggal awal sampai akhir (1 -> 31)
+  const [hasManuallySelectedMonth, setHasManuallySelectedMonth] = useState(false);
   const [previewPhotoEntry, setPreviewPhotoEntry] = useState<LogbookEntry | null>(null);
   const [entryToDelete, setEntryToDelete] = useState<LogbookEntry | null>(null);
   const [recoveryFeedback, setRecoveryFeedback] = useState<{
@@ -142,7 +153,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
       });
   }, [entries, searchTerm, filterMonth, filterAttendance, sortOrder]);
 
-  // Available months from entries
+  // Available months from entries, sorted descending (latest first, e.g. 2026-11, 2026-10, ...)
   const availableMonths = useMemo(() => {
     const set = new Set<string>();
     entries.forEach((e) => {
@@ -152,25 +163,105 @@ export const LogbookList: React.FC<LogbookListProps> = ({
     return Array.from(set).sort().reverse();
   }, [entries]);
 
-  // Statistics
-  const stats = useMemo(() => {
+  // Compute month breakdown data with Indonesian labels and photo counts
+  const monthDataMap = useMemo(() => {
+    const map = new Map<string, {
+      key: string;
+      label: string;
+      shortLabel: string;
+      year: number;
+      monthNum: number;
+      totalEntries: number;
+      wfoCount: number;
+      sakitCount: number;
+      cutiCount: number;
+      photoCount: number;
+    }>();
+
+    entries.forEach((e) => {
+      const pd = parseDateDetails(e.tanggal);
+      const ym = pd.formattedYMD.substring(0, 7);
+      if (!map.has(ym)) {
+        const mIdx = Math.max(0, Math.min(11, pd.month - 1));
+        const label = `${MONTH_NAMES[mIdx]} ${pd.year}`;
+        const shortLabel = `${MONTH_NAMES[mIdx].substring(0, 3)} '${String(pd.year).substring(2)}`;
+        map.set(ym, {
+          key: ym,
+          label,
+          shortLabel,
+          year: pd.year,
+          monthNum: pd.month,
+          totalEntries: 0,
+          wfoCount: 0,
+          sakitCount: 0,
+          cutiCount: 0,
+          photoCount: 0,
+        });
+      }
+      const item = map.get(ym)!;
+      item.totalEntries++;
+      if (e.kehadiran === 'WFO') item.wfoCount++;
+      else if (e.kehadiran === 'Sakit') item.sakitCount++;
+      else if (e.kehadiran === 'Cuti') item.cutiCount++;
+
+      if (e.fotoSebelum) item.photoCount++;
+      if (e.fotoSesudah) item.photoCount++;
+      if (e.suratSakit) item.photoCount++;
+    });
+
+    return map;
+  }, [entries]);
+
+  // Automatically select the latest month with entries so the view is always per satu bulan by default
+  useEffect(() => {
+    if (!hasManuallySelectedMonth && availableMonths.length > 0) {
+      setFilterMonth(availableMonths[0]);
+    } else if (filterMonth !== 'all' && availableMonths.length > 0 && !availableMonths.includes(filterMonth)) {
+      setFilterMonth(availableMonths[0]);
+    }
+  }, [availableMonths, hasManuallySelectedMonth, filterMonth]);
+
+  // Quick navigation between months (e.g. November -> Oktober)
+  const currentMonthIdx = availableMonths.indexOf(filterMonth);
+  const canGoPrevious = currentMonthIdx >= 0 && currentMonthIdx < availableMonths.length - 1; // older month
+  const canGoNext = currentMonthIdx > 0; // newer month
+
+  const handleGoPreviousMonth = () => {
+    if (canGoPrevious) {
+      setHasManuallySelectedMonth(true);
+      setFilterMonth(availableMonths[currentMonthIdx + 1]);
+    }
+  };
+
+  const handleGoNextMonth = () => {
+    if (canGoNext) {
+      setHasManuallySelectedMonth(true);
+      setFilterMonth(availableMonths[currentMonthIdx - 1]);
+    }
+  };
+
+  // Active month object if a single month is filtered
+  const activeMonthData = filterMonth !== 'all' ? monthDataMap.get(filterMonth) : null;
+
+  // Statistics for current filtered view
+  const currentStats = useMemo(() => {
     let wfoCount = 0;
     let sakitCount = 0;
     let cutiCount = 0;
 
-    entries.forEach((e) => {
+    filteredEntries.forEach((e) => {
       if (e.kehadiran === 'WFO') wfoCount++;
       else if (e.kehadiran === 'Sakit') sakitCount++;
       else if (e.kehadiran === 'Cuti') cutiCount++;
     });
 
     return {
-      total: entries.length,
+      total: filteredEntries.length,
       wfoCount,
       sakitCount,
       cutiCount,
     };
-  }, [entries]);
+  }, [filteredEntries]);
 
   // Export JSON backup
   const handleExportJson = () => {
@@ -357,6 +448,162 @@ export const LogbookList: React.FC<LogbookListProps> = ({
         </div>
       )}
 
+      {/* ========================================================================= */}
+      {/* KATEGORI BULAN (TAMPILAN TERPADU PER SATU BULAN) */}
+      {/* Memudahkan pengguna berpindah antar bulan (misal November ke Oktober) dengan rapi & cepat */}
+      {/* Setiap bulan tersimpan rapih & lengkap dengan seluruh foto dokumentasi */}
+      {/* ========================================================================= */}
+      {availableMonths.length > 0 && (
+        <div className="bg-stone-950/85 backdrop-blur-md p-4 sm:p-5 rounded-2xl border border-white/10 shadow-xl space-y-3.5 text-white">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-stone-800/80 pb-3">
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 shrink-0">
+                <Calendar className="w-4 h-4" />
+              </div>
+              <div>
+                <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-2 flex-wrap">
+                  <span>Kategori Bulan Rekap Laporan</span>
+                  <span className="text-[10px] font-semibold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                    {availableMonths.length} Bulan Tersimpan
+                  </span>
+                </h2>
+                <p className="text-xs text-stone-300">
+                  Data logbook disajikan per satu bulan lengkap dengan foto dokumentasi. Ketuk kategori bulan di bawah untuk berpindah periode:
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Prev / Next Month Navigator */}
+            {filterMonth !== 'all' && (
+              <div className="flex items-center gap-1.5 self-start sm:self-center shrink-0">
+                <button
+                  type="button"
+                  onClick={handleGoPreviousMonth}
+                  disabled={!canGoPrevious}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-stone-900 border border-stone-700 hover:bg-stone-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-stone-300 hover:text-white cursor-pointer active:scale-95"
+                  title="Lihat bulan sebelumnya"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                  <span className="hidden xs:inline">Bulan Sebelumnya</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGoNextMonth}
+                  disabled={!canGoNext}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold bg-stone-900 border border-stone-700 hover:bg-stone-800 disabled:opacity-30 disabled:cursor-not-allowed transition-all text-stone-300 hover:text-white cursor-pointer active:scale-95"
+                  title="Lihat bulan berikutnya"
+                >
+                  <span className="hidden xs:inline">Bulan Berikutnya</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Month Chips List (Horizontal scrollable & wrap) */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 pt-0.5 scrollbar-thin">
+            {availableMonths.map((ym) => {
+              const data = monthDataMap.get(ym);
+              if (!data) return null;
+              const isActive = filterMonth === ym;
+
+              return (
+                <button
+                  key={ym}
+                  type="button"
+                  onClick={() => {
+                    setHasManuallySelectedMonth(true);
+                    setFilterMonth(ym);
+                  }}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition-all shrink-0 cursor-pointer select-none border ${
+                    isActive
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white border-emerald-400 shadow-md ring-2 ring-emerald-400/40 scale-[1.02]'
+                      : 'bg-stone-900/90 text-stone-300 border-stone-700/80 hover:bg-stone-800 hover:text-white hover:border-emerald-500/40'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isActive ? 'bg-amber-300 animate-pulse' : 'bg-stone-500'}`} />
+                  <span>{data.label}</span>
+                  <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${
+                    isActive ? 'bg-emerald-950/60 text-emerald-100' : 'bg-stone-800 text-stone-400'
+                  }`}>
+                    {data.totalEntries}
+                  </span>
+                  {data.photoCount > 0 && (
+                    <span className="flex items-center gap-0.5 text-[10px] text-amber-300" title={`${data.photoCount} foto dokumentasi tersimpan`}>
+                      <Camera className="w-3 h-3" />
+                      <span>{data.photoCount}</span>
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+
+            {/* Opsi Tampilkan Semua Bulan */}
+            <button
+              type="button"
+              onClick={() => {
+                setHasManuallySelectedMonth(true);
+                setFilterMonth('all');
+              }}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all shrink-0 cursor-pointer border ${
+                filterMonth === 'all'
+                  ? 'bg-emerald-700 text-white border-emerald-400 shadow-md ring-2 ring-emerald-400/30'
+                  : 'bg-stone-900/70 text-stone-400 border-stone-800 hover:bg-stone-800 hover:text-stone-200'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Semua Bulan</span>
+              <span className="text-[10px] font-mono opacity-80">({entries.length})</span>
+            </button>
+          </div>
+
+          {/* Active Month Status Banner */}
+          {activeMonthData ? (
+            <div className="bg-emerald-950/50 border border-emerald-500/30 rounded-xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2.5">
+                <span className="text-amber-300 text-sm">📅</span>
+                <div>
+                  <p className="font-bold text-white text-xs sm:text-sm">
+                    Menampilkan Rekap: Bulan {activeMonthData.label}
+                  </p>
+                  <p className="text-[11px] text-emerald-200 mt-0.5">
+                    {activeMonthData.totalEntries} kegiatan tercatat ({activeMonthData.wfoCount} WFO, {activeMonthData.sakitCount} Sakit, {activeMonthData.cutiCount} Cuti) · Seluruh foto dokumentasi ({activeMonthData.photoCount} foto) tersimpan aman &amp; lengkap.
+                  </p>
+                </div>
+              </div>
+
+              {onNavigateToReport && (
+                <button
+                  type="button"
+                  onClick={onNavigateToReport}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-colors shrink-0 shadow-xs cursor-pointer"
+                  title="Lihat format resmi kedinasan untuk bulan ini"
+                >
+                  <span>Buka di Laporan Resmi</span>
+                  <span>→</span>
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="bg-stone-900/60 border border-stone-800 rounded-xl p-2.5 text-xs text-stone-400 flex items-center justify-between">
+              <span>Menampilkan seluruh {entries.length} catatan kegiatan dari semua bulan.</span>
+              {availableMonths.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setHasManuallySelectedMonth(true);
+                    setFilterMonth(availableMonths[0]);
+                  }}
+                  className="text-emerald-400 hover:underline text-[11px] font-semibold cursor-pointer"
+                >
+                  Kembali ke tampilan per bulan ({monthDataMap.get(availableMonths[0])?.label})
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Quick Attendance KPI strip */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-xs flex flex-col">
@@ -364,9 +611,11 @@ export const LogbookList: React.FC<LogbookListProps> = ({
             Total Kegiatan
           </span>
           <span className="text-2xl font-extrabold text-stone-900 mt-0.5 tabular-nums">
-            {stats.total}
+            {currentStats.total}
           </span>
-          <span className="text-[11px] text-stone-500 mt-0.5">Semua entri tercatat</span>
+          <span className="text-[11px] text-stone-500 mt-0.5">
+            {filterMonth !== 'all' && activeMonthData ? `Bulan ${activeMonthData.label}` : 'Semua entri tercatat'}
+          </span>
         </div>
 
         <div className="bg-white p-3.5 rounded-xl border border-stone-200 shadow-xs flex flex-col">
@@ -374,7 +623,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
             Kehadiran WFO
           </span>
           <span className="text-2xl font-extrabold text-emerald-800 mt-0.5 tabular-nums">
-            {stats.wfoCount}
+            {currentStats.wfoCount}
           </span>
           <span className="text-[11px] text-emerald-600 mt-0.5">Hari kerja di kebun</span>
         </div>
@@ -384,7 +633,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
             Izin Sakit
           </span>
           <span className="text-2xl font-extrabold text-amber-800 mt-0.5 tabular-nums">
-            {stats.sakitCount}
+            {currentStats.sakitCount}
           </span>
           <span className="text-[11px] text-amber-600 mt-0.5">Hari keterangan sakit</span>
         </div>
@@ -394,7 +643,7 @@ export const LogbookList: React.FC<LogbookListProps> = ({
             Cuti Resmi
           </span>
           <span className="text-2xl font-extrabold text-blue-800 mt-0.5 tabular-nums">
-            {stats.cutiCount}
+            {currentStats.cutiCount}
           </span>
           <span className="text-[11px] text-blue-600 mt-0.5">Hari cuti tahunan/resmi</span>
         </div>
@@ -472,17 +721,18 @@ export const LogbookList: React.FC<LogbookListProps> = ({
           {/* Month filter */}
           <select
             value={filterMonth}
-            onChange={(e) => setFilterMonth(e.target.value)}
-            className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white"
+            onChange={(e) => {
+              setHasManuallySelectedMonth(true);
+              setFilterMonth(e.target.value);
+            }}
+            className="px-3 py-2 text-xs sm:text-sm rounded-lg border border-stone-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-white font-medium"
           >
-            <option value="all">Semua Bulan</option>
+            <option value="all">Semua Bulan ({entries.length})</option>
             {availableMonths.map((m) => {
-              const [y, mon] = m.split('-');
-              const date = new Date(parseInt(y), parseInt(mon) - 1, 1);
-              const label = date.toLocaleDateString('id-ID', { month: 'long', year: 'numeric' });
+              const data = monthDataMap.get(m);
               return (
                 <option key={m} value={m}>
-                  {label}
+                  {data?.label || m} ({data?.totalEntries || 0} entri)
                 </option>
               );
             })}
