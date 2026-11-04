@@ -46,7 +46,6 @@ import { LogbookList } from './components/LogbookList';
 import { OfficialReportView } from './components/OfficialReportView';
 import { EPersonalView } from './components/EPersonalView';
 import { ProfileView } from './components/ProfileView';
-import { PWAInstallButton } from './components/PWAInstallButton';
 import { OfflineIndicator } from './components/OfflineIndicator';
 import { AppUpdateNotification } from './components/AppUpdateNotification';
 import { CloudSyncView } from './components/CloudSyncView';
@@ -511,11 +510,6 @@ export default function App() {
 
       {/* Main Content Area */}
       <main className="flex-1 pb-16 space-y-4">
-        {/* PWA Standalone Banner (auto-hides when installed in standalone mode) */}
-        <div className="max-w-7xl mx-auto px-4 pt-2 sm:px-6 no-print print:hidden">
-          <PWAInstallButton variant="banner" />
-        </div>
-
         {activeTab === 'form' && (
           <LogbookForm
             onSaveEntry={handleSaveEntry}
